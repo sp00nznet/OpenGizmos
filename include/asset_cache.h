@@ -1,0 +1,152 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <unordered_map>
+#include <cstdint>
+#include <functional>
+
+struct SDL_Texture;
+struct SDL_Renderer;
+struct Mix_Chunk;
+struct _Mix_Music;
+typedef _Mix_Music Mix_Music;
+
+namespace opengg {
+
+// Forward declarations
+class NEResourceExtractor;
+class GrpArchive;
+struct Sprite;
+
+// Asset types
+enum class AssetType {
+    Texture,
+    Sprite,
+    Sound,
+    Music,
+    Data
+};
+
+// Asset metadata stored in cache index
+struct AssetMeta {
+    std::string id;
+    AssetType type;
+    std::string sourcePath;
+    uint32_t sourceOffset;
+    uint32_t crc32;
+    uint64_t timestamp;
+    uint32_t width;
+    uint32_t height;
+};
+
+// Cached texture with reference counting
+struct CachedTexture {
+    SDL_Texture* texture;
+    int width;
+    int height;
+    int refCount;
+
+    CachedTexture() : texture(nullptr), width(0), height(0), refCount(0) {}
+};
+
+// Asset Cache System
+// Extracts assets from original game files and caches converted versions
+class AssetCache {
+public:
+    AssetCache();
+    ~AssetCache();
+
+    // Initialize with game path and cache directory
+    bool initialize(const std::string& gamePath, const std::string& cachePath);
+
+    // Set SDL renderer for texture creation
+    void setRenderer(SDL_Renderer* renderer);
+
+    // Check if cache is valid (matches original files)
+    bool validateCache();
+
+    // Clear all cached data
+    void clearCache();
+
+    // Get texture by asset ID (e.g., "gizmo256:bitmap:100")
+    SDL_Texture* getTexture(const std::string& assetId);
+
+    // Get sprite data by ID
+    std::shared_ptr<Sprite> getSprite(const std::string& assetId);
+
+    // Get sound effect
+    Mix_Chunk* getSound(const std::string& assetId);
+
+    // Get music
+    Mix_Music* getMusic(const std::string& assetId);
+
+    // Get raw data
+    std::vector<uint8_t> getData(const std::string& assetId);
+
+    // Release a texture (decrement ref count)
+    void releaseTexture(const std::string& assetId);
+
+    // Preload assets matching a pattern
+    void preload(const std::string& pattern);
+
+    // Get cache statistics
+    struct Stats {
+        size_t texturesLoaded;
+        size_t texturesCached;
+        size_t soundsLoaded;
+        size_t cacheHits;
+        size_t cacheMisses;
+        size_t memoryUsed;
+    };
+    Stats getStats() const;
+
+    // Get last error
+    std::string getLastError() const { return lastError_; }
+
+    // Asset ID helpers
+    static std::string makeAssetId(const std::string& source, const std::string& type, int id);
+    static bool parseAssetId(const std::string& assetId, std::string& source, std::string& type, int& id);
+
+private:
+    // Internal asset loading
+    bool loadFromNE(const std::string& source, const std::string& type, int id,
+                    std::vector<uint8_t>& data);
+    bool loadFromGrp(const std::string& source, const std::string& name,
+                     std::vector<uint8_t>& data);
+
+    // Cache file operations
+    bool loadCacheIndex();
+    bool saveCacheIndex();
+    std::string getCacheFilePath(const std::string& assetId) const;
+    bool saveToCache(const std::string& assetId, const std::vector<uint8_t>& data);
+    std::vector<uint8_t> loadFromCache(const std::string& assetId);
+
+    // CRC32 calculation
+    uint32_t calculateCRC32(const std::vector<uint8_t>& data);
+
+    std::string gamePath_;
+    std::string cachePath_;
+    SDL_Renderer* renderer_ = nullptr;
+
+    // Loaded assets
+    std::unordered_map<std::string, CachedTexture> textures_;
+    std::unordered_map<std::string, std::shared_ptr<Sprite>> sprites_;
+    std::unordered_map<std::string, Mix_Chunk*> sounds_;
+    std::unordered_map<std::string, Mix_Music*> music_;
+
+    // Source file handles (lazy loaded)
+    std::unordered_map<std::string, std::unique_ptr<NEResourceExtractor>> neFiles_;
+    std::unordered_map<std::string, std::unique_ptr<GrpArchive>> grpFiles_;
+
+    // Cache index
+    std::unordered_map<std::string, AssetMeta> cacheIndex_;
+
+    // Statistics
+    mutable Stats stats_ = {};
+
+    std::string lastError_;
+};
+
+} // namespace opengg

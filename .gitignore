@@ -1,0 +1,40 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# IDE files
+.vs/
+.vscode/
+*.vcxproj*
+*.sln
+.idea/
+*.swp
+*.swo
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Cache
+assets/
+cache/
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies (if vendored)
+libs/SDL2*
+
+# Screenshots
+*.bmp
+*.png
+screenshot*
