@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <cstdlib>
 
 using namespace opengg;
 
@@ -280,6 +281,8 @@ void MainMenuState::selectItem() {
 
 // Main function
 int main(int argc, char* argv[]) {
+    SDL_SetMainReady();
+
     // Parse command line arguments
     GameConfig config;
     config.windowTitle = "OpenGizmos - Super Solvers: Gizmos & Gadgets";

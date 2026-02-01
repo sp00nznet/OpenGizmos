@@ -154,18 +154,18 @@ private:
     Room* currentRoom_ = nullptr;
 };
 
-// Building class - contains multiple areas (floors)
-class Building {
+// GameBuilding class - contains multiple areas (floors)
+class GameBuilding {
 public:
-    Building();
-    ~Building();
+    GameBuilding();
+    ~GameBuilding();
 
     // Load building from game data
     bool load(int buildingId, AssetCache* assetCache);
 
     // Properties
     int getId() const { return id_; }
-    opengg::Building getDifficulty() const { return difficulty_; }
+    Building getDifficulty() const { return difficulty_; }
     int getAreaCount() const { return static_cast<int>(areas_.size()); }
 
     // Area access
@@ -179,7 +179,7 @@ public:
 
 private:
     int id_ = 0;
-    opengg::Building difficulty_ = opengg::Building::Easy;
+    Building difficulty_ = Building::Easy;
     std::vector<std::unique_ptr<Area>> areas_;
     Area* currentArea_ = nullptr;
 };

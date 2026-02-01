@@ -367,13 +367,13 @@ void Area::goToRoom(int roomId, int startX, int startY) {
     // Position would be set on player, not stored here
 }
 
-// Building implementation
-Building::Building() = default;
-Building::~Building() = default;
+// GameBuilding implementation
+GameBuilding::GameBuilding() = default;
+GameBuilding::~GameBuilding() = default;
 
-bool Building::load(int buildingId, AssetCache* assetCache) {
+bool GameBuilding::load(int buildingId, AssetCache* assetCache) {
     id_ = buildingId;
-    difficulty_ = static_cast<opengg::Building>(buildingId);
+    difficulty_ = static_cast<Building>(buildingId);
 
     // TODO: Load building data from game files
     // Each building has 5 floors (areas)
@@ -391,22 +391,22 @@ bool Building::load(int buildingId, AssetCache* assetCache) {
     return true;
 }
 
-Area* Building::getArea(int floor) {
+Area* GameBuilding::getArea(int floor) {
     if (floor >= 0 && floor < static_cast<int>(areas_.size())) {
         return areas_[floor].get();
     }
     return nullptr;
 }
 
-void Building::setCurrentArea(int floor) {
+void GameBuilding::setCurrentArea(int floor) {
     currentArea_ = getArea(floor);
 }
 
-void Building::goToFloor(int floor) {
+void GameBuilding::goToFloor(int floor) {
     setCurrentArea(floor);
 }
 
-void Building::goToFloor(int floor, int roomId) {
+void GameBuilding::goToFloor(int floor, int roomId) {
     setCurrentArea(floor);
     if (currentArea_) {
         currentArea_->goToRoom(roomId);

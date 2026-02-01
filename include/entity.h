@@ -106,7 +106,7 @@ public:
 
     // Room reference
     Room* getRoom() const { return room_; }
-    void setRoom(Room* room) { room_ = room; }
+    virtual void setRoom(Room* room) { room_ = room; }
 
 protected:
     // Position and movement
