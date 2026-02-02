@@ -58,12 +58,17 @@ set(BOT_SOURCES
     src/bot/educational_bot.cpp
 )
 
+set(NEPTUNE_SOURCES
+    src/neptune/neptune_game.cpp
+)
+
 set(ALL_SOURCES
     src/main.cpp
     ${LOADER_SOURCES}
     ${ENGINE_SOURCES}
     ${GAME_SOURCES}
     ${BOT_SOURCES}
+    ${NEPTUNE_SOURCES}
 )
 
 # Main executable
