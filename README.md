@@ -1,13 +1,34 @@
 # OpenGizmos
 
-An open-source reimplementation of **Super Solvers: Gizmos & Gadgets** that runs on modern Windows (and potentially other platforms).
+An open-source reimplementation of **The Learning Company's Super Solvers series** that runs on modern systems.
 
-> **Note:** You must provide your own copy of the original game. OpenGizmos extracts and converts assets on-the-fly from a legitimate installation.
+> **Note:** You must provide your own copy of the original games. OpenGizmos extracts and converts assets on-the-fly from legitimate installations.
+
+## Supported Games
+
+| Game | Status | Year |
+|------|--------|------|
+| Super Solvers: Gizmos & Gadgets | Primary Focus | 1993 |
+| Super Solvers: Operation Neptune | In Progress | 1991 |
+| Super Solvers: OutNumbered! | Planned | 1990 |
+| Super Solvers: Spellbound! | Planned | 1991 |
+| Super Solvers: Treasure Mountain! | Planned | 1990 |
+| Treasure MathStorm! | Planned | 1992 |
+| Treasure Cove! | Research | 1992 |
+
+## Vision
+
+Preserve and modernize the classic TLC educational games from the early 1990s by:
+- Running natively on modern Windows, macOS, and Linux
+- Supporting high-resolution displays with proper scaling
+- Maintaining authentic gameplay while improving quality-of-life
+- Documenting the original game formats for preservation
 
 ## Features
 
 - **Modern SDL2 Engine** - Hardware-accelerated rendering at native resolution with scaling
-- **Asset Extraction** - Reads directly from original game files (.DAT, .GRP, .SMK)
+- **Asset Extraction** - Reads directly from original game files (.DAT, .RSC, .GRP, .SMK)
+- **Multi-Game Support** - Unified engine with game-specific logic modules
 - **Full Input Support** - Keyboard, mouse, and customizable key bindings
 - **Audio System** - Sound effects and MIDI music playback via SDL_mixer
 
@@ -15,7 +36,7 @@ An open-source reimplementation of **Super Solvers: Gizmos & Gadgets** that runs
 
 ### Requirements
 - Windows 10/11 (64-bit)
-- Original copy of Super Solvers: Gizmos & Gadgets
+- Original copy of one or more supported games
 - Visual Studio 2022 (for building from source)
 
 ### Pre-built Binaries
@@ -25,8 +46,8 @@ Download the latest release from the [Releases](../../releases) page.
 
 ```bash
 # Clone the repository
-git clone https://github.com/sp00nznet/-OpenGizmos.git
-cd -OpenGizmos
+git clone https://github.com/sp00nznet/OpenGizmos.git
+cd OpenGizmos
 
 # Create build directory
 mkdir build && cd build
@@ -77,25 +98,31 @@ opengg/
 │   ├── game/              # Game logic (entities, rooms, puzzles)
 │   └── formats/           # File format definitions
 ├── include/               # Public headers
+├── docs/                  # Documentation
+│   ├── GAME_FORMATS.md    # File format specifications
+│   └── MISSION_STRUCTURE.md # Game progression documentation
 └── libs/                  # SDL2 libraries
 ```
 
 ## Documentation
 
-- [Architecture Overview](docs/ARCHITECTURE.md)
-- [File Formats](docs/FILE_FORMATS.md)
-- [Building Guide](docs/BUILDING.md)
+- [Game Formats](docs/GAME_FORMATS.md) - File format specifications for all games
+- [Mission Structure](docs/MISSION_STRUCTURE.md) - Game progression and objectives
 
 ## Asset Tool
 
-The `asset_tool` utility can inspect and extract assets from the original game:
+The `asset_tool` utility can inspect and extract assets from the original games:
 
 ```bash
-# List resources in a .DAT file
+# List resources in a .DAT or .RSC file
 asset_tool list-ne GIZMO256.DAT
+asset_tool list-ne SORTER.RSC
 
 # Extract all resources
 asset_tool extract-ne GIZMO256.DAT output_dir/
+
+# Extract sprites with palette
+asset_tool extract-indexed SORTER.RSC palette.pal sprites/
 
 # Validate game installation
 asset_tool validate "C:\Games\Gizmos"
@@ -103,30 +130,36 @@ asset_tool validate "C:\Games\Gizmos"
 
 ## Status
 
-This is an early work-in-progress. Current milestone: **Proof of Concept**
+This is an early work-in-progress.
 
-- [x] Project setup with CMake + SDL2
+### Gizmos & Gadgets
 - [x] NE resource extractor
-- [x] GRP archive decoder
-- [x] Smacker video decoder (basic)
-- [x] SDL2 renderer
-- [x] Audio system
-- [x] Input system with action mapping
-- [x] Entity system
-- [x] Room/level framework
-- [x] Puzzle framework (Balance, Gear implemented)
-- [ ] Full game data loading
-- [ ] Complete puzzle implementations
-- [ ] Vehicle building
+- [x] Sprite decoder with RLE decompression
+- [x] SDL2 renderer and audio
+- [x] Entity and room framework
+- [x] Puzzle framework (Balance, Gear)
+- [ ] Complete puzzle implementations (8 types)
+- [ ] Vehicle building system
 - [ ] Racing minigame
 - [ ] Morty AI
-- [ ] Save/load system
+
+### Operation Neptune
+- [x] RSC file format decoder
+- [x] Palette extraction (doubled-byte format)
+- [x] Sprite extraction from SORTER.RSC
+- [ ] Labyrinth map decoder
+- [ ] Puzzle implementations
+- [ ] Submarine navigation
+
+### Other Games
+- [x] Format analysis for SSO, SSR, TMS
+- [ ] Game-specific implementations
 
 ## Legal
 
-OpenGizmos is a clean-room reimplementation. It does not contain any copyrighted assets from the original game. You must own a legitimate copy of Super Solvers: Gizmos & Gadgets to play.
+OpenGizmos is a clean-room reimplementation. It does not contain any copyrighted assets from the original games. You must own a legitimate copy of the supported games to play.
 
-This project is not affiliated with or endorsed by The Learning Company or any current rights holders.
+This project is not affiliated with or endorsed by The Learning Company, SoftKey, or any current rights holders.
 
 ## License
 
@@ -134,6 +167,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- Original game by The Learning Company (1993)
+- Original games by The Learning Company (1990-1993)
 - SDL2 library by the SDL Community
 - Inspired by projects like OpenMW, DevilutionX, and OpenRA
