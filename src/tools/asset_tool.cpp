@@ -3089,12 +3089,6 @@ void findWidth(const std::string& datPath, const std::string& palettePath, const
 }
 
 void extractIndexedSprites(const std::string& datPath, const std::string& palettePath, const std::string& outDir) {
-    std::ifstream file(datPath, std::ios::binary);
-    if (!file) {
-        std::cerr << "Failed to open DAT file\n";
-        return;
-    }
-
     uint8_t palette[256][4] = {};
     loadPalette(palettePath, palette);
 
@@ -3108,99 +3102,123 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
 
     auto resources = ne.listResources();
     int totalExtracted = 0;
-    const uint32_t SPRITE_BASE = 0x10000;
+
+    // Known dimensions for specific resources (from successful manual extractions)
+    std::map<int, std::pair<int,int>> knownDims = {
+        {35283, {94, 109}},
+        {35368, {64, 58}},
+        {35384, {55, 47}},
+        {35299, {31, 9}},
+        {35557, {43, 43}},
+        {34368, {64, 64}},  // Gizmos
+        {34441, {11, 17}},  // Gizmos small sprites
+    };
 
     for (const auto& res : resources) {
-        if (res.typeId != 0xFF01 || res.size < 22) continue;  // CUSTOM_32513 index
+        if (res.typeId != 0xFF01 || res.size < 18) continue;  // CUSTOM_32513
 
-        auto indexData = ne.extractResource(res);
-        if (indexData.size() < 22) continue;
+        auto data = ne.extractResource(res);
+        if (data.size() < 18) continue;
 
-        // Parse header: bytes 0-1 = spriteCount, 2-3 = frameCount
-        uint16_t spriteCount = indexData[0] | (indexData[1] << 8);
-        uint16_t frameCount = indexData[2] | (indexData[3] << 8);
+        // Parse header:
+        // bytes 0-1: version (usually 1)
+        // bytes 2-3: sprite/frame count
+        // bytes 4-13: reserved
+        // bytes 14+: offset table (4 bytes per sprite)
+        uint16_t version = data[0] | (data[1] << 8);
+        uint16_t spriteCount = data[2] | (data[3] << 8);
 
-        if (spriteCount == 0 || spriteCount > 100) continue;
-        if (frameCount == 0 || frameCount > 200) continue;
+        if (version != 1 || spriteCount == 0 || spriteCount > 500) continue;
 
-        // Offset table starts at byte 18
+        size_t headerSize = 14 + spriteCount * 4;
+        if (data.size() < headerSize) continue;
+
+        // Read offset table (starts at byte 14)
         std::vector<uint32_t> offsets;
-        for (size_t i = 18; i + 3 < indexData.size(); i += 4) {
-            uint32_t off = indexData[i] | (indexData[i+1] << 8) |
-                          (indexData[i+2] << 16) | (indexData[i+3] << 24);
-            if (off > 0 && off < 0x100000) {
-                offsets.push_back(SPRITE_BASE + off);
+        for (int i = 0; i < spriteCount; ++i) {
+            size_t idx = 14 + i * 4;
+            uint32_t off = data[idx] | (data[idx+1] << 8) |
+                          (data[idx+2] << 16) | (data[idx+3] << 24);
+            offsets.push_back(off);
+        }
+
+        // Determine dimensions
+        int width, height;
+        auto knownIt = knownDims.find(res.id);
+        if (knownIt != knownDims.end()) {
+            width = knownIt->second.first;
+            height = knownIt->second.second;
+        } else {
+            // Estimate dimensions by counting row terminators (0x00)
+            if (offsets.empty() || offsets[0] >= data.size()) continue;
+
+            uint32_t firstOff = offsets[0];
+            uint32_t spriteSize = (spriteCount > 1 && offsets[1] > firstOff)
+                                  ? (offsets[1] - firstOff)
+                                  : (data.size() - firstOff);
+
+            int rowCount = 0;
+            for (size_t i = firstOff; i < firstOff + spriteSize && i < data.size(); ++i) {
+                if (data[i] == 0x00) rowCount++;
             }
-        }
 
-        if (offsets.empty()) continue;
+            if (rowCount < 4) continue;
+            height = rowCount;
 
-        // Read dimensions from first frame
-        file.seekg(offsets[0]);
-        uint8_t header[4];
-        file.read(reinterpret_cast<char*>(header), 4);
-
-        int width = header[0];
-        int height = header[1];
-
-        // Validate dimensions - both should be reasonable sprite sizes
-        // Check if header looks like actual dimensions vs pixel data
-        bool widthValid = (width >= 4 && width <= 128);
-        bool heightValid = (height >= 4 && height <= 128);
-
-        // Check aspect ratio - sprites shouldn't be too extreme
-        float aspectRatio = (float)std::max(width, height) / std::max(1, std::min(width, height));
-        bool aspectValid = (aspectRatio <= 10.0f);  // Max 10:1 ratio
-
-        // If dimensions look wrong, try to detect headerless sprites
-        if (!widthValid || !heightValid || !aspectValid) {
-            // Skip sprites without proper headers for now
-            continue;
-        }
-
-        if (width * height > 32768) continue;
-
-        int totalPixels = width * height;
-
-        // Extract each frame
-        for (size_t frameIdx = 0; frameIdx < offsets.size() && frameIdx < (size_t)frameCount; ++frameIdx) {
-            file.seekg(offsets[frameIdx]);
-            std::vector<uint8_t> data(4096);
-            file.read(reinterpret_cast<char*>(data.data()), data.size());
-
-            // First frame has header, others don't
-            int dataStart = (frameIdx == 0) ? 2 : 0;
-
-            // Decompress using RLE with skip commands:
-            // FF <byte> <count> = repeat byte (count+1) times
-            // 00 <count> = skip (count+1) pixels (transparent)
-            // Other = literal pixel
-            std::vector<uint8_t> pixels(totalPixels, 0);  // Initialize transparent
-            int pixelIdx = 0;
-
-            for (size_t pos = dataStart; pos < data.size() && pixelIdx < totalPixels; ) {
-                if (data[pos] == 0xFF && pos + 2 < data.size()) {
-                    uint8_t byte = data[pos + 1];
-                    uint8_t count = data[pos + 2];
-                    for (int k = 0; k <= count && pixelIdx < totalPixels; ++k) {
-                        pixels[pixelIdx++] = byte;
-                    }
-                    pos += 3;
-                } else if (data[pos] == 0x00 && pos + 1 < data.size()) {
-                    // Skip: advance by (count+1) pixels
-                    uint8_t count = data[pos + 1];
-                    pixelIdx += (count + 1);
-                    if (pixelIdx > totalPixels) pixelIdx = totalPixels;
-                    pos += 2;
-                } else {
-                    if (pixelIdx < totalPixels) {
-                        pixels[pixelIdx++] = data[pos];
-                    }
-                    pos++;
+            // Estimate width based on data density
+            int estWidth = std::max(16, std::min(256, (int)(spriteSize * 2 / rowCount)));
+            // Round to common sizes
+            int commonWidths[] = {16, 24, 32, 40, 48, 55, 64, 80, 94, 96, 128};
+            width = 32;
+            int minDiff = 9999;
+            for (int cw : commonWidths) {
+                int diff = std::abs(cw - estWidth);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    width = cw;
                 }
             }
+        }
 
-            if (pixelIdx < totalPixels / 2) continue;  // Skip if less than half filled
+        if (width * height > 65536) continue;
+        int totalPixels = width * height;
+
+        // Extract each sprite frame
+        for (size_t frameIdx = 0; frameIdx < offsets.size(); ++frameIdx) {
+            uint32_t offset = offsets[frameIdx];
+            if (offset >= data.size()) continue;
+
+            // Decompress RLE:
+            // FF <value> <count> = repeat value for (count+1) times
+            // 00 = row terminator (move to next row, x = 0)
+            // Other = literal pixel
+            std::vector<uint8_t> pixels(totalPixels, 0);
+            int x = 0, y = 0;
+
+            for (size_t pos = offset; pos < data.size() && y < height; ) {
+                uint8_t byte = data[pos++];
+
+                if (byte == 0xFF && pos + 1 < data.size()) {
+                    uint8_t value = data[pos++];
+                    uint8_t count = data[pos++];
+                    for (int k = 0; k <= count && x < width; ++k) {
+                        if (y * width + x < totalPixels) {
+                            pixels[y * width + x] = value;
+                        }
+                        x++;
+                    }
+                } else if (byte == 0x00) {
+                    // Row terminator - move to next row
+                    y++;
+                    x = 0;
+                } else {
+                    // Literal pixel
+                    if (x < width && y * width + x < totalPixels) {
+                        pixels[y * width + x] = byte;
+                    }
+                    x++;
+                }
+            }
 
             // Vertical flip the pixel data
             std::vector<uint8_t> flipped(totalPixels);
