@@ -129,6 +129,13 @@ ONWINCD/
 | 35557 | 28KB | 43x43 | 4 | Icons/buttons |
 | 42788-42810 | 0.5-4KB | small | few | UI elements |
 
+**Palette Discovery (Operation Neptune):**
+The palette data is stored in CUSTOM_32514 (sprite metadata) resources:
+- Format: `00 R 00 G 00 B` (6 bytes per color, 1536 bytes total)
+- Each sprite resource has its own palette in its matching CUSTOM_32514
+- Extract by taking every other byte starting from index 1
+- First 16 entries match standard VGA palette (black, red, green, etc.)
+
 ## Sprite Format (Common)
 
 ### Header Structure (CUSTOM_32513)
