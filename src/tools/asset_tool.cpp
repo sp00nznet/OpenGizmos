@@ -3094,29 +3094,46 @@ void findWidth(const std::string& datPath, const std::string& palettePath, const
     std::cout << "Look through them to find which width shows a clear sprite!\n";
 }
 
-// Estimate dimensions by counting row terminators (0x00) in sprite data
+// Estimate dimensions by decompressing RLE and counting actual pixels per row
 std::pair<int,int> estimateDimensions(const std::vector<uint8_t>& data, uint32_t startOffset, uint32_t spriteSize) {
-    // Count 0x00 bytes (row terminators) to estimate height
+    // Decompress RLE to count pixels per row and find max width needed
+    int maxRowPixels = 0;
+    int currentRowPixels = 0;
     int rowCount = 0;
-    for (uint32_t i = startOffset; i < startOffset + spriteSize && i < data.size(); ++i) {
-        if (data[i] == 0x00) rowCount++;
+    size_t endOffset = std::min((size_t)(startOffset + spriteSize), data.size());
+
+    for (size_t pos = startOffset; pos < endOffset; ) {
+        uint8_t byte = data[pos++];
+
+        if (byte == 0xFF && pos + 1 < endOffset) {
+            // RLE: skip value, read count
+            pos++;  // value
+            uint8_t count = data[pos++] + 1;
+            currentRowPixels += count;
+        } else if (byte == 0x00) {
+            // Row terminator
+            if (currentRowPixels > maxRowPixels) maxRowPixels = currentRowPixels;
+            currentRowPixels = 0;
+            rowCount++;
+        } else {
+            // Literal pixel
+            currentRowPixels++;
+        }
     }
+    // Handle last row if no terminator
+    if (currentRowPixels > maxRowPixels) maxRowPixels = currentRowPixels;
+    if (currentRowPixels > 0) rowCount++;
 
     if (rowCount == 0) return {32, 32};
+    if (maxRowPixels == 0) maxRowPixels = 32;
 
-    // Estimate width from uncompressed size / height
-    int estimatedPixels = spriteSize * 2;  // Rough estimate (RLE typically halves size)
-    int estimatedWidth = std::max(16, std::min(256, estimatedPixels / rowCount));
-
-    // Round to common sprite widths (matching PowerShell reference)
+    // Round max width UP to common sprite widths
     static const int commonWidths[] = {16, 24, 32, 40, 48, 55, 64, 80, 94, 96, 128, 160, 192, 256};
-    int closestW = 32;
-    int minDiff = 999;
+    int closestW = 256;  // Default to max if nothing fits
     for (int w : commonWidths) {
-        int diff = std::abs(w - estimatedWidth);
-        if (diff < minDiff) {
-            minDiff = diff;
+        if (w >= maxRowPixels) {
             closestW = w;
+            break;
         }
     }
 
