@@ -65,14 +65,25 @@ When encountering sea creatures, player must solve:
 ### Win Condition
 Collect all formula canisters and return safely to the submarine base.
 
-### Asset Mapping (Expected)
-| Game Element | Resource File | Type |
-|--------------|---------------|------|
-| Labyrinth maps | LABRNTH1.RSC, LABRNTH2.RSC | Tilemaps |
-| Sorting puzzles | SORTER.RSC | Sprites + logic |
-| Reading puzzles | READER1.RSC, READER2.RSC | Text + UI |
-| Common sprites | COMMON.RSC | Submarine, creatures |
-| Audio | WSCOMMON.GRP, WS*.GRP | WAV files |
+### Asset Mapping (Verified)
+| Game Element | Resource File | Resource IDs | Format |
+|--------------|---------------|--------------|--------|
+| Labyrinth maps | LABRNTH1.RSC | 63968-63998 | RLE tilemaps |
+| Labyrinth maps | LABRNTH2.RSC | 64008 | RLE tilemaps |
+| Sorting puzzles | SORTER.RSC | 35xxx, 42xxx | CUSTOM_32513 sprites |
+| Reading puzzles | READER1.RSC | 63868-63918 | Sprites + text |
+| Reading puzzles | READER2.RSC | varies | Sprites + text |
+| Additional data | OT3.RSC | 64068-64108 | Mixed sprites/data |
+| Audio (SFX) | COMMON.RSC | 64168-64203 | RIFF WAV |
+| Audio (music) | WSCOMMON.GRP | - | WAV wrapper |
+| Palettes | LABRNTH*.RSC | first resource | Doubled-byte RGB |
+
+### Sprite Categories (SORTER.RSC)
+| ID Range | Purpose |
+|----------|---------|
+| 35271-35385 | Large sprites (characters, items to sort) |
+| 35427-35680 | Medium sprites (UI, icons) |
+| 42788-42810 | Small UI elements (buttons, indicators) |
 
 ---
 

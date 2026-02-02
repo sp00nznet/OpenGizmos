@@ -112,11 +112,22 @@ ONWINCD/
 - Uses NE format like other TLC games
 - SORTER.RSC uses standard CUSTOM_32513/32514/32515 types
 - Other RSC files use different custom type IDs (0x79xx range):
-  - Type 63968 (0xF9E0): Map/sprite data
-  - Type 63978 (0xF9EA): Map data
-  - Types 64168-64203: WAV audio resources
-- Palette stored as doubled bytes (16-bit format) in map RSC files
-- GRP files are simple WAV wrappers, not complex archives like Spellbound Wizards
+  - Type 63868-63918: READER puzzle sprites/data
+  - Type 63968-63998: LABRNTH map data and sprites
+  - Type 64068-64108: OT3 additional game data
+  - Types 64168-64203: WAV audio resources (COMMON.RSC)
+- Palette stored as doubled bytes (16-bit format) in small resources (1536 bytes)
+- GRP files are simple WAV wrappers, not complex archives
+
+**SORTER.RSC Sprite Analysis:**
+| Resource ID | Size | Dimensions | Frames | Likely Purpose |
+|-------------|------|------------|--------|----------------|
+| 35283 | 184KB | 94x109 | 27 | Character animation |
+| 35296 | 792KB | varies | many | Main sprite sheet |
+| 35368 | 214KB | 64x58 | 26 | Sortable items |
+| 35384 | 220KB | 55x47 | 36 | Sortable items |
+| 35557 | 28KB | 43x43 | 4 | Icons/buttons |
+| 42788-42810 | 0.5-4KB | small | few | UI elements |
 
 ## Sprite Format (Common)
 
