@@ -139,21 +139,49 @@ The palette data is stored in CUSTOM_32514 (sprite metadata) resources:
 ## Sprite Format (Common)
 
 ### Header Structure (CUSTOM_32513)
+
+**Two header formats detected in Operation Neptune:**
+
+**Format A (Little-Endian) - Resources 35271-35385, 42788-42810:**
 ```
 Offset  Size  Description
-0x00    2     Sprite count
-0x02    2     Version/flags
-0x04    2     Width
-0x06    2     Height
-0x08    N     Offset table (4 bytes per sprite)
+0x00    2     Version (0x0001, little-endian)
+0x02    2     Sprite count (little-endian)
+0x04    10    Unknown/reserved (often 0x08 0x00 ...)
+0x0E    N     Offset table (4 bytes per sprite, LE 32-bit)
 ```
+
+**Format B (Big-Endian) - Resources 35296, 35322, 35323, etc:**
+```
+Offset  Size  Description
+0x00    2     Version (0x0001, big-endian: 00 01)
+0x02    2     Sprite count (big-endian: 00 NN)
+0x04    12    Unknown/reserved
+0x10    N     Offset table (4 bytes per sprite, LE 32-bit)
+```
+
+**Important:** Sprite dimensions (width/height) are NOT stored in the header.
+They must be determined from:
+- External metadata (definition files)
+- Auto-detection from RLE data (count row terminators for height)
+- Known values from testing
 
 ### RLE Compression
 ```
 FF <byte> <count>  - Repeat byte (count+1) times
-00                 - Row terminator or skip
-NN                 - Literal pixel (NN < 0xFF)
+00                 - Row terminator (advance to next row)
+NN                 - Literal pixel (for any NN where 0 < NN < 0xFF)
 ```
+
+### Verified Sprite Dimensions (SORTER.RSC)
+| Resource | Sprites | Dimensions | Content |
+|----------|---------|------------|---------|
+| 35283 | 27 | 94x109 | Character animation |
+| 35368 | 26 | 64x58 | Sortable items |
+| 35384 | 36 | 55x47 | Sortable items |
+| 35299 | 8 | 31x9 | Text/labels |
+| 35557 | 4 | 43x43 | Icons |
+| 35296 | 94 | varies | Main sprite sheet |
 
 ## Room/Level Structure (CUSTOM_32516)
 
