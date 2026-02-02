@@ -105,6 +105,10 @@ void printUsage(const char* progName) {
     std::cout << "                           Extract all sprites using index metadata\n";
     std::cout << "  extract-rund <file> <palette> <outdir>\n";
     std::cout << "                           Extract RUND format sprites (Treasure games)\n";
+    std::cout << "  extract-labyrinth <file> <outdir>\n";
+    std::cout << "                           Extract Operation Neptune labyrinth tilemaps\n";
+    std::cout << "  extract-labyrinth-sprites <file> <palette> <outdir>\n";
+    std::cout << "                           Extract Operation Neptune labyrinth sprites\n";
     std::cout << "  extract-dims <file> <palette> <offset> <w> <h> [header=0|1] <out>\n";
     std::cout << "                           Extract sprite with specified dimensions\n";
     std::cout << "  test-rle <file> <palette> <offset> <w> <h> <outdir>\n";
@@ -3387,6 +3391,304 @@ void extractRundSprites(const std::string& datPath, const std::string& palettePa
     std::cout << "Extracted " << totalExtracted << " RUND sprites to " << outDir << "\n";
 }
 
+// Extract Operation Neptune labyrinth tilemaps (640x480 RLE-compressed)
+// Palette is in separate 1536-byte resources (doubled-byte format: 00 R 00 G 00 B)
+void extractLabyrinthTilemaps(const std::string& datPath, const std::string& outDir) {
+    NEResourceExtractor ne;
+    if (!ne.open(datPath)) {
+        std::cerr << "Failed to open NE: " << ne.getLastError() << "\n";
+        return;
+    }
+
+    fs::create_directories(outDir);
+
+    auto resources = ne.listResources();
+
+    // First pass: collect palettes (1536-byte resources)
+    std::map<int, std::vector<uint8_t>> palettes;
+    for (const auto& res : resources) {
+        if (res.size == 1536) {
+            auto data = ne.extractResource(res);
+            // Convert doubled-byte palette to standard RGB
+            std::vector<uint8_t> pal(256 * 4, 0);
+            for (int i = 0; i < 256 && i * 6 + 5 < (int)data.size(); ++i) {
+                // Format: 00 R 00 G 00 B (every other byte)
+                pal[i * 4 + 2] = data[i * 6 + 1];  // Red
+                pal[i * 4 + 1] = data[i * 6 + 3];  // Green
+                pal[i * 4 + 0] = data[i * 6 + 5];  // Blue
+                pal[i * 4 + 3] = 0;                 // Reserved
+            }
+            palettes[res.id] = pal;
+            std::cout << "Found palette for ID " << res.id << "\n";
+        }
+    }
+
+    int totalExtracted = 0;
+
+    // Second pass: extract tilemaps (large resources with tilemap header)
+    for (const auto& res : resources) {
+        if (res.size < 0x2A) continue;  // Need at least header
+
+        auto data = ne.extractResource(res);
+        if (data.size() < 0x2A) continue;
+
+        // Check for tilemap header signature
+        uint16_t version = data[0] | (data[1] << 8);
+        uint16_t type = data[2] | (data[3] << 8);
+
+        if (version != 1 || type != 1) continue;
+
+        // Check for separator at 0x20
+        if (data[0x20] != 0xFF || data[0x21] != 0xFF) continue;
+
+        // Read dimensions
+        uint16_t width = data[0x26] | (data[0x27] << 8);
+        uint16_t height = data[0x28] | (data[0x29] << 8);
+
+        if (width != 640 || height != 480) continue;  // Only 640x480 tilemaps
+
+        std::cout << "Decoding tilemap " << res.id << " (" << width << "x" << height << ")...\n";
+
+        // Find matching palette
+        std::vector<uint8_t>* palette = nullptr;
+        if (palettes.count(res.id)) {
+            palette = &palettes[res.id];
+        } else {
+            // Use first available palette
+            if (!palettes.empty()) {
+                palette = &palettes.begin()->second;
+            }
+        }
+
+        int totalPixels = width * height;
+        std::vector<uint8_t> pixels(totalPixels, 0);
+
+        // Decompress RLE starting at byte 0x2A
+        // Format: FF VV CC = repeat value VV for CC+1 times
+        //         Other = literal pixel
+        int pixelIdx = 0;
+        size_t pos = 0x2A;
+
+        while (pos < data.size() && pixelIdx < totalPixels) {
+            uint8_t byte = data[pos++];
+
+            if (byte == 0xFF && pos + 1 < data.size()) {
+                uint8_t value = data[pos++];
+                uint8_t count = data[pos++];
+                int repeat = count + 1;
+                for (int k = 0; k < repeat && pixelIdx < totalPixels; ++k) {
+                    pixels[pixelIdx++] = value;
+                }
+            } else {
+                pixels[pixelIdx++] = byte;
+            }
+        }
+
+        // Write BMP
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%s/tilemap_%05d_%dx%d.bmp",
+                 outDir.c_str(), res.id, width, height);
+
+        std::ofstream out(filename, std::ios::binary);
+        if (!out) continue;
+
+        int rowSize = (width + 3) & ~3;
+        int imageSize = rowSize * height;
+        int bmpSize = 54 + 1024 + imageSize;
+
+        uint8_t bmpHeader[54] = {'B', 'M'};
+        *(uint32_t*)&bmpHeader[2] = bmpSize;
+        *(uint32_t*)&bmpHeader[10] = 54 + 1024;
+        *(uint32_t*)&bmpHeader[14] = 40;
+        *(int32_t*)&bmpHeader[18] = width;
+        *(int32_t*)&bmpHeader[22] = height;
+        *(uint16_t*)&bmpHeader[26] = 1;
+        *(uint16_t*)&bmpHeader[28] = 8;
+        *(uint32_t*)&bmpHeader[34] = imageSize;
+
+        out.write(reinterpret_cast<char*>(bmpHeader), 54);
+
+        // Write palette
+        if (palette) {
+            out.write(reinterpret_cast<char*>(palette->data()), 1024);
+        } else {
+            // Default grayscale palette
+            for (int i = 0; i < 256; ++i) {
+                uint8_t p[4] = {(uint8_t)i, (uint8_t)i, (uint8_t)i, 0};
+                out.write(reinterpret_cast<char*>(p), 4);
+            }
+        }
+
+        // Write pixel rows (BMP is bottom-up)
+        std::vector<uint8_t> row(rowSize, 0);
+        for (int by = height - 1; by >= 0; --by) {
+            for (int bx = 0; bx < width; ++bx) {
+                size_t idx = by * width + bx;
+                row[bx] = (idx < pixels.size()) ? pixels[idx] : 0;
+            }
+            out.write(reinterpret_cast<char*>(row.data()), rowSize);
+        }
+
+        totalExtracted++;
+    }
+
+    std::cout << "Extracted " << totalExtracted << " tilemaps to " << outDir << "\n";
+}
+
+// Extract Operation Neptune labyrinth sprites (uses different type IDs)
+void extractLabyrinthSprites(const std::string& datPath, const std::string& palettePath, const std::string& outDir) {
+    uint8_t palette[256][4] = {};
+    loadPalette(palettePath, palette);
+
+    // Set palette index 0 to magenta (transparency)
+    palette[0][0] = 255;
+    palette[0][1] = 0;
+    palette[0][2] = 255;
+    palette[0][3] = 0;
+
+    NEResourceExtractor ne;
+    if (!ne.open(datPath)) {
+        std::cerr << "Failed to open NE: " << ne.getLastError() << "\n";
+        return;
+    }
+
+    fs::create_directories(outDir);
+
+    auto resources = ne.listResources();
+    int totalExtracted = 0;
+
+    for (const auto& res : resources) {
+        // Skip small (palette) and large (tilemap) resources
+        if (res.size < 100 || res.size == 1536) continue;
+
+        auto data = ne.extractResource(res);
+        if (data.size() < 18) continue;
+
+        // Check for sprite header (version 1, sprite count)
+        uint16_t version = data[0] | (data[1] << 8);
+        uint16_t spriteCount = data[2] | (data[3] << 8);
+
+        // Labyrinth sprites have version=1 and reasonable sprite count
+        if (version != 1 || spriteCount == 0 || spriteCount > 100) continue;
+
+        // Check if this looks like a tilemap (has separator at 0x20)
+        if (data.size() > 0x22 && data[0x20] == 0xFF && data[0x21] == 0xFF) continue;
+
+        size_t headerSize = 14 + spriteCount * 4;
+        if (data.size() < headerSize) continue;
+
+        // Read offset table
+        std::vector<uint32_t> offsets;
+        for (int i = 0; i < spriteCount; ++i) {
+            size_t idx = 14 + i * 4;
+            uint32_t off = data[idx] | (data[idx+1] << 8) |
+                          (data[idx+2] << 16) | (data[idx+3] << 24);
+            offsets.push_back(off);
+        }
+
+        // Estimate dimensions from first sprite
+        uint32_t firstOffset = offsets[0];
+        uint32_t spriteSize = (offsets.size() > 1) ? offsets[1] - firstOffset : data.size() - firstOffset;
+
+        // Count row terminators to estimate height
+        int rowCount = 0;
+        for (size_t p = firstOffset; p < firstOffset + spriteSize && p < data.size(); ++p) {
+            if (data[p] == 0x00) rowCount++;
+        }
+        if (rowCount == 0) rowCount = 32;
+
+        // Estimate width
+        int estimatedPixels = spriteSize * 2;
+        int estimatedWidth = std::max(16, std::min(256, estimatedPixels / rowCount));
+
+        static const int commonWidths[] = {16, 24, 32, 40, 48, 64, 80, 96, 128};
+        int width = 32;
+        int minDiff = 999;
+        for (int w : commonWidths) {
+            int diff = std::abs(w - estimatedWidth);
+            if (diff < minDiff) {
+                minDiff = diff;
+                width = w;
+            }
+        }
+        int height = rowCount;
+
+        std::cout << "Extracting " << spriteCount << " sprites from resource " << res.id
+                  << " (" << width << "x" << height << ")...\n";
+
+        // Extract each sprite
+        for (size_t frameIdx = 0; frameIdx < offsets.size(); ++frameIdx) {
+            uint32_t offset = offsets[frameIdx];
+            if (offset >= data.size()) continue;
+
+            int totalPixels = width * height;
+            std::vector<uint8_t> pixels(totalPixels, 0);
+
+            int x = 0, y = 0;
+            size_t pos = offset;
+
+            while (pos < data.size() && y < height) {
+                uint8_t byte = data[pos++];
+
+                if (byte == 0xFF && pos + 1 < data.size()) {
+                    uint8_t value = data[pos++];
+                    uint8_t count = data[pos++] + 1;
+                    for (int k = 0; k < count && x < width; ++k) {
+                        if (y < height) pixels[y * width + x] = value;
+                        x++;
+                    }
+                } else if (byte == 0x00) {
+                    y++;
+                    x = 0;
+                } else {
+                    if (x < width && y < height) pixels[y * width + x] = byte;
+                    x++;
+                }
+            }
+
+            // Write BMP
+            char filename[256];
+            snprintf(filename, sizeof(filename), "%s/lab_%05d_spr%03zu_%dx%d.bmp",
+                     outDir.c_str(), res.id, frameIdx, width, height);
+
+            std::ofstream out(filename, std::ios::binary);
+            if (!out) continue;
+
+            int rowSize = (width + 3) & ~3;
+            int imageSize = rowSize * height;
+            int bmpSize = 54 + 1024 + imageSize;
+
+            uint8_t bmpHeader[54] = {'B', 'M'};
+            *(uint32_t*)&bmpHeader[2] = bmpSize;
+            *(uint32_t*)&bmpHeader[10] = 54 + 1024;
+            *(uint32_t*)&bmpHeader[14] = 40;
+            *(int32_t*)&bmpHeader[18] = width;
+            *(int32_t*)&bmpHeader[22] = height;
+            *(uint16_t*)&bmpHeader[26] = 1;
+            *(uint16_t*)&bmpHeader[28] = 8;
+            *(uint32_t*)&bmpHeader[34] = imageSize;
+
+            out.write(reinterpret_cast<char*>(bmpHeader), 54);
+
+            for (int i = 0; i < 256; ++i) {
+                out.write(reinterpret_cast<char*>(palette[i]), 4);
+            }
+
+            std::vector<uint8_t> row(rowSize, 0);
+            for (int by = height - 1; by >= 0; --by) {
+                for (int bx = 0; bx < width; ++bx) {
+                    row[bx] = pixels[by * width + bx];
+                }
+                out.write(reinterpret_cast<char*>(row.data()), rowSize);
+            }
+
+            totalExtracted++;
+        }
+    }
+
+    std::cout << "Extracted " << totalExtracted << " labyrinth sprites to " << outDir << "\n";
+}
+
 void testRLEFormats(const std::string& datPath, const std::string& palettePath,
                     uint32_t offset, int width, int height, const std::string& outDir) {
     std::ifstream file(datPath, std::ios::binary);
@@ -4939,6 +5241,10 @@ int main(int argc, char* argv[]) {
         extractIndexedSprites(argv[2], argv[3], argv[4]);
     } else if (command == "extract-rund" && argc >= 5) {
         extractRundSprites(argv[2], argv[3], argv[4]);
+    } else if (command == "extract-labyrinth" && argc >= 4) {
+        extractLabyrinthTilemaps(argv[2], argv[3]);
+    } else if (command == "extract-labyrinth-sprites" && argc >= 5) {
+        extractLabyrinthSprites(argv[2], argv[3], argv[4]);
     } else if (command == "extract-dims" && argc >= 8) {
         uint32_t offset = std::stoul(argv[4], nullptr, 0);
         int width = std::stoi(argv[5]);
