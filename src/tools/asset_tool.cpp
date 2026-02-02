@@ -103,6 +103,8 @@ void printUsage(const char* progName) {
     std::cout << "                           Extract single sprite at offset using header dims\n";
     std::cout << "  extract-indexed <file> <palette> <outdir>\n";
     std::cout << "                           Extract all sprites using index metadata\n";
+    std::cout << "  extract-rund <file> <palette> <outdir>\n";
+    std::cout << "                           Extract RUND format sprites (Treasure games)\n";
     std::cout << "  extract-dims <file> <palette> <offset> <w> <h> [header=0|1] <out>\n";
     std::cout << "                           Extract sprite with specified dimensions\n";
     std::cout << "  test-rle <file> <palette> <offset> <w> <h> <outdir>\n";
@@ -3275,6 +3277,116 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
     std::cout << "Extracted " << totalExtracted << " sprite frames to " << outDir << "\n";
 }
 
+// Extract sprites in RUND format (Treasure Cove, Treasure Mountain)
+// Format: width(2) + height(2) + "RUND" + RLE data
+void extractRundSprites(const std::string& datPath, const std::string& palettePath, const std::string& outDir) {
+    uint8_t palette[256][4] = {};
+    loadPalette(palettePath, palette);
+
+    // Set palette index 0 to magenta (transparency indicator)
+    palette[0][0] = 255;  // Blue
+    palette[0][1] = 0;    // Green
+    palette[0][2] = 255;  // Red
+    palette[0][3] = 0;    // Reserved
+
+    NEResourceExtractor ne;
+    if (!ne.open(datPath)) {
+        std::cerr << "Failed to open NE: " << ne.getLastError() << "\n";
+        return;
+    }
+
+    fs::create_directories(outDir);
+
+    auto resources = ne.listResources();
+    int totalExtracted = 0;
+
+    for (const auto& res : resources) {
+        if (res.typeId != 0xFF01 || res.size < 8) continue;  // CUSTOM_32513
+
+        auto data = ne.extractResource(res);
+        if (data.size() < 8) continue;
+
+        // Check for RUND magic at bytes 4-7
+        if (data[4] != 'R' || data[5] != 'U' || data[6] != 'N' || data[7] != 'D') continue;
+
+        // Parse dimensions
+        uint16_t width = data[0] | (data[1] << 8);
+        uint16_t height = data[2] | (data[3] << 8);
+
+        // Sanity check dimensions
+        if (width == 0 || width > 1024 || height == 0 || height > 1024) continue;
+
+        int totalPixels = width * height;
+        std::vector<uint8_t> pixels(totalPixels, 0);
+
+        // Decompress RLE starting at byte 8
+        // Format: FF VV CC = repeat value VV for CC+1 times
+        //         Other = literal pixel (no row terminators in this format)
+        int pixelIdx = 0;
+        size_t pos = 8;
+
+        while (pos < data.size() && pixelIdx < totalPixels) {
+            uint8_t byte = data[pos++];
+
+            if (byte == 0xFF && pos + 1 < data.size()) {
+                // RLE: repeat value for count+1 times
+                uint8_t value = data[pos++];
+                uint8_t count = data[pos++];
+                int repeat = count + 1;
+                for (int k = 0; k < repeat && pixelIdx < totalPixels; ++k) {
+                    pixels[pixelIdx++] = value;
+                }
+            } else {
+                // Literal pixel
+                pixels[pixelIdx++] = byte;
+            }
+        }
+
+        // Write BMP
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%s/rund_%05d_%dx%d.bmp",
+                 outDir.c_str(), res.id, width, height);
+
+        std::ofstream out(filename, std::ios::binary);
+        if (!out) continue;
+
+        int rowSize = (width + 3) & ~3;
+        int imageSize = rowSize * height;
+        int bmpSize = 54 + 1024 + imageSize;
+
+        uint8_t bmpHeader[54] = {'B', 'M'};
+        *(uint32_t*)&bmpHeader[2] = bmpSize;
+        *(uint32_t*)&bmpHeader[10] = 54 + 1024;
+        *(uint32_t*)&bmpHeader[14] = 40;
+        *(int32_t*)&bmpHeader[18] = width;
+        *(int32_t*)&bmpHeader[22] = height;
+        *(uint16_t*)&bmpHeader[26] = 1;
+        *(uint16_t*)&bmpHeader[28] = 8;
+        *(uint32_t*)&bmpHeader[34] = imageSize;
+
+        out.write(reinterpret_cast<char*>(bmpHeader), 54);
+
+        // Write palette (BGRA format)
+        for (int i = 0; i < 256; ++i) {
+            out.write(reinterpret_cast<char*>(palette[i]), 4);
+        }
+
+        // Write pixel rows (BMP is bottom-up, so flip Y)
+        std::vector<uint8_t> row(rowSize, 0);
+        for (int by = height - 1; by >= 0; --by) {
+            for (int bx = 0; bx < width; ++bx) {
+                size_t idx = by * width + bx;
+                row[bx] = (idx < pixels.size()) ? pixels[idx] : 0;
+            }
+            out.write(reinterpret_cast<char*>(row.data()), rowSize);
+        }
+
+        totalExtracted++;
+    }
+
+    std::cout << "Extracted " << totalExtracted << " RUND sprites to " << outDir << "\n";
+}
+
 void testRLEFormats(const std::string& datPath, const std::string& palettePath,
                     uint32_t offset, int width, int height, const std::string& outDir) {
     std::ifstream file(datPath, std::ios::binary);
@@ -4825,6 +4937,8 @@ int main(int argc, char* argv[]) {
         extractSingleSprite(argv[2], argv[3], offset, argv[5]);
     } else if (command == "extract-indexed" && argc >= 5) {
         extractIndexedSprites(argv[2], argv[3], argv[4]);
+    } else if (command == "extract-rund" && argc >= 5) {
+        extractRundSprites(argv[2], argv[3], argv[4]);
     } else if (command == "extract-dims" && argc >= 8) {
         uint32_t offset = std::stoul(argv[4], nullptr, 0);
         int width = std::stoi(argv[5]);
