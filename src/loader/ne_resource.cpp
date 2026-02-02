@@ -81,7 +81,7 @@ bool NEResourceExtractor::open(const std::string& path) {
             res.typeId = typeInfo.typeId;
             res.id = nameInfo.id;
             res.offset = static_cast<uint32_t>(nameInfo.offset) << alignmentShift_;
-            res.size = nameInfo.length;
+            res.size = static_cast<uint32_t>(nameInfo.length) << alignmentShift_;
             res.flags = nameInfo.flags;
 
             // Determine type name
@@ -147,7 +147,7 @@ std::vector<uint8_t> NEResourceExtractor::extractResourceByOffset(uint32_t offse
 }
 
 bool NEResourceExtractor::extractBitmap(uint16_t id, const std::string& outPath) {
-    auto data = extractResource(RT_BITMAP, id);
+    auto data = extractResource(NE_RT_BITMAP, id);
     if (data.empty()) {
         return false;
     }
@@ -202,18 +202,18 @@ bool NEResourceExtractor::extractBitmap(uint16_t id, const std::string& outPath)
 
 std::string NEResourceExtractor::getResourceTypeName(uint16_t typeId) const {
     switch (typeId) {
-        case RT_CURSOR:       return "CURSOR";
-        case RT_BITMAP:       return "BITMAP";
-        case RT_ICON:         return "ICON";
-        case RT_MENU:         return "MENU";
-        case RT_DIALOG:       return "DIALOG";
-        case RT_STRING:       return "STRING";
-        case RT_FONTDIR:      return "FONTDIR";
-        case RT_FONT:         return "FONT";
-        case RT_ACCELERATOR:  return "ACCELERATOR";
-        case RT_RCDATA:       return "RCDATA";
-        case RT_GROUP_CURSOR: return "GROUP_CURSOR";
-        case RT_GROUP_ICON:   return "GROUP_ICON";
+        case NE_RT_CURSOR:       return "CURSOR";
+        case NE_RT_BITMAP:       return "BITMAP";
+        case NE_RT_ICON:         return "ICON";
+        case NE_RT_MENU:         return "MENU";
+        case NE_RT_DIALOG:       return "DIALOG";
+        case NE_RT_STRING:       return "STRING";
+        case NE_RT_FONTDIR:      return "FONTDIR";
+        case NE_RT_FONT:         return "FONT";
+        case NE_RT_ACCELERATOR:  return "ACCELERATOR";
+        case NE_RT_RCDATA:       return "RCDATA";
+        case NE_RT_GROUP_CURSOR: return "GROUP_CURSOR";
+        case NE_RT_GROUP_ICON:   return "GROUP_ICON";
         default:
             // Custom or unknown type
             if (typeId & 0x8000) {

@@ -448,11 +448,11 @@ bool AssetCache::loadFromNE(const std::string& source, const std::string& type, 
     }
 
     // Determine resource type
-    uint16_t resType = RT_RCDATA;
+    uint16_t resType = NE_RT_RCDATA;
     if (type == "bitmap") {
-        resType = RT_BITMAP;
+        resType = NE_RT_BITMAP;
     } else if (type == "font") {
-        resType = RT_FONT;
+        resType = NE_RT_FONT;
     }
 
     data = it->second->extractResource(resType, static_cast<uint16_t>(id));
@@ -610,6 +610,234 @@ uint32_t AssetCache::calculateCRC32(const std::vector<uint8_t>& data) {
         crc = crc32Table[(crc ^ byte) & 0xFF] ^ (crc >> 8);
     }
     return crc ^ 0xFFFFFFFF;
+}
+
+std::vector<std::pair<std::string, std::string>> AssetCache::listNEResources(const std::string& filename) {
+    std::vector<std::pair<std::string, std::string>> result;
+
+    // Build full path
+    std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
+    if (!fs::exists(fullPath)) {
+        fullPath = gamePath_ + "/" + filename;
+        if (!fs::exists(fullPath)) {
+            return result;
+        }
+    }
+
+    // Check if we have this file cached
+    auto it = neFiles_.find(filename);
+    if (it == neFiles_.end()) {
+        auto extractor = std::make_unique<NEResourceExtractor>();
+        if (!extractor->open(fullPath)) {
+            return result;
+        }
+        neFiles_[filename] = std::move(extractor);
+        it = neFiles_.find(filename);
+    }
+
+    // Get all resources
+    auto resources = it->second->listResources();
+    for (const auto& res : resources) {
+        char info[128];
+        snprintf(info, sizeof(info), "Type: %s  ID: %u  Size: %u bytes",
+                 res.typeName.c_str(), res.id, res.size);
+        result.emplace_back(res.name.empty() ?
+            ("Resource " + std::to_string(res.id)) : res.name, info);
+    }
+
+    return result;
+}
+
+std::vector<Resource> AssetCache::getNEResourceList(const std::string& filename) {
+    // Build full path
+    std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
+    if (!fs::exists(fullPath)) {
+        fullPath = gamePath_ + "/" + filename;
+        if (!fs::exists(fullPath)) {
+            return {};
+        }
+    }
+
+    // Check if we have this file cached
+    auto it = neFiles_.find(filename);
+    if (it == neFiles_.end()) {
+        auto extractor = std::make_unique<NEResourceExtractor>();
+        if (!extractor->open(fullPath)) {
+            return {};
+        }
+        neFiles_[filename] = std::move(extractor);
+        it = neFiles_.find(filename);
+    }
+
+    return it->second->listResources();
+}
+
+std::vector<std::string> AssetCache::listGRPFiles(const std::string& filename) {
+    std::vector<std::string> result;
+
+    // Build full path - GRP files are in ASSETS folder
+    std::string fullPath = gamePath_ + "/ASSETS/" + filename;
+    if (!fs::exists(fullPath)) {
+        fullPath = gamePath_ + "/" + filename;
+        if (!fs::exists(fullPath)) {
+            return result;
+        }
+    }
+
+    // Check if we have this file cached
+    auto it = grpFiles_.find(filename);
+    if (it == grpFiles_.end()) {
+        auto archive = std::make_unique<GrpArchive>();
+        if (!archive->open(fullPath)) {
+            return result;
+        }
+        grpFiles_[filename] = std::move(archive);
+        it = grpFiles_.find(filename);
+    }
+
+    return it->second->listFiles();
+}
+
+std::vector<uint8_t> AssetCache::getRawResource(const std::string& filename, uint16_t type, uint16_t id) {
+    // Build full path
+    std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
+    if (!fs::exists(fullPath)) {
+        fullPath = gamePath_ + "/" + filename;
+        if (!fs::exists(fullPath)) {
+            return {};
+        }
+    }
+
+    // Check if we have this file cached
+    auto it = neFiles_.find(filename);
+    if (it == neFiles_.end()) {
+        auto extractor = std::make_unique<NEResourceExtractor>();
+        if (!extractor->open(fullPath)) {
+            return {};
+        }
+        neFiles_[filename] = std::move(extractor);
+        it = neFiles_.find(filename);
+    }
+
+    return it->second->extractResource(type, id);
+}
+
+SDL_Texture* AssetCache::createTextureFromBitmap(const std::vector<uint8_t>& bitmapData, int* outWidth, int* outHeight) {
+#ifdef SDL_h_
+    if (!renderer_ || bitmapData.size() < 40) {
+        return nullptr;
+    }
+
+    // Parse BITMAPINFOHEADER
+    const uint8_t* data = bitmapData.data();
+    uint32_t headerSize = *reinterpret_cast<const uint32_t*>(data);
+    int32_t width = *reinterpret_cast<const int32_t*>(data + 4);
+    int32_t height = *reinterpret_cast<const int32_t*>(data + 8);
+    uint16_t planes = *reinterpret_cast<const uint16_t*>(data + 12);
+    uint16_t bitCount = *reinterpret_cast<const uint16_t*>(data + 14);
+    uint32_t compression = *reinterpret_cast<const uint32_t*>(data + 16);
+
+    // Handle negative height (top-down bitmap)
+    bool topDown = height < 0;
+    if (topDown) height = -height;
+
+    if (outWidth) *outWidth = width;
+    if (outHeight) *outHeight = height;
+
+    // Only support uncompressed bitmaps for now
+    if (compression != 0) {
+        lastError_ = "Compressed bitmaps not supported";
+        return nullptr;
+    }
+
+    // Calculate palette info
+    uint32_t paletteSize = 0;
+    uint32_t colorCount = 0;
+    if (bitCount <= 8) {
+        colorCount = *reinterpret_cast<const uint32_t*>(data + 32);
+        if (colorCount == 0) {
+            colorCount = 1u << bitCount;
+        }
+        paletteSize = colorCount * 4;
+    }
+
+    const uint8_t* palette = data + headerSize;
+    const uint8_t* pixels = palette + paletteSize;
+
+    // Calculate row stride (rows are padded to 4-byte boundaries)
+    int rowStride = ((width * bitCount + 31) / 32) * 4;
+
+    // Create SDL surface
+    SDL_Surface* surface = SDL_CreateRGBSurface(0, width, height, 32,
+        0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    if (!surface) {
+        lastError_ = "Failed to create surface";
+        return nullptr;
+    }
+
+    // Convert pixel data
+    uint32_t* destPixels = static_cast<uint32_t*>(surface->pixels);
+
+    for (int y = 0; y < height; ++y) {
+        int srcY = topDown ? y : (height - 1 - y);
+        const uint8_t* srcRow = pixels + srcY * rowStride;
+
+        for (int x = 0; x < width; ++x) {
+            uint8_t r, g, b;
+
+            if (bitCount == 8) {
+                uint8_t index = srcRow[x];
+                if (index < colorCount) {
+                    b = palette[index * 4 + 0];
+                    g = palette[index * 4 + 1];
+                    r = palette[index * 4 + 2];
+                } else {
+                    r = g = b = 0;
+                }
+            } else if (bitCount == 4) {
+                uint8_t byte = srcRow[x / 2];
+                uint8_t index = (x % 2 == 0) ? (byte >> 4) : (byte & 0x0F);
+                if (index < colorCount) {
+                    b = palette[index * 4 + 0];
+                    g = palette[index * 4 + 1];
+                    r = palette[index * 4 + 2];
+                } else {
+                    r = g = b = 0;
+                }
+            } else if (bitCount == 1) {
+                uint8_t byte = srcRow[x / 8];
+                uint8_t bit = (byte >> (7 - (x % 8))) & 1;
+                if (bit < colorCount) {
+                    b = palette[bit * 4 + 0];
+                    g = palette[bit * 4 + 1];
+                    r = palette[bit * 4 + 2];
+                } else {
+                    r = g = b = 0;
+                }
+            } else if (bitCount == 24) {
+                b = srcRow[x * 3 + 0];
+                g = srcRow[x * 3 + 1];
+                r = srcRow[x * 3 + 2];
+            } else if (bitCount == 32) {
+                b = srcRow[x * 4 + 0];
+                g = srcRow[x * 4 + 1];
+                r = srcRow[x * 4 + 2];
+            } else {
+                r = g = b = 128; // Unsupported format
+            }
+
+            destPixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+        }
+    }
+
+    // Create texture from surface
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
+    SDL_FreeSurface(surface);
+
+    return texture;
+#else
+    return nullptr;
+#endif
 }
 
 } // namespace opengg

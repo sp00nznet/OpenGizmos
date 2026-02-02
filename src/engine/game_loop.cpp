@@ -3,6 +3,13 @@
 #include "audio.h"
 #include "input.h"
 #include "asset_cache.h"
+#include "font.h"
+#ifdef _WIN32
+#include "menu.h"
+#include "asset_viewer.h"
+#include <ShlObj.h>
+#include <commdlg.h>
+#endif
 #include <SDL.h>
 #include <fstream>
 #include <filesystem>
@@ -20,6 +27,11 @@ Game::~Game() {
 
 bool Game::initialize(const GameConfig& config) {
     config_ = config;
+
+#ifdef _WIN32
+    // Initialize COM for file dialogs
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+#endif
 
     // Auto-detect game path if not specified
     if (config_.gamePath.empty()) {
@@ -111,6 +123,25 @@ bool Game::initialize(const GameConfig& config) {
     assetCache_->setRenderer(renderer_->getSDLRenderer());
     audio_->setAssetCache(assetCache_.get());
 
+    // Initialize text renderer
+    textRenderer_ = std::make_unique<TextRenderer>();
+    if (!textRenderer_->initialize(renderer_->getSDLRenderer())) {
+        SDL_Log("Warning: Text renderer initialization failed");
+    }
+
+#ifdef _WIN32
+    // Initialize menu bar
+    menuBar_ = std::make_unique<MenuBar>();
+    if (!menuBar_->initialize(renderer_->getSDLWindow())) {
+        SDL_Log("Warning: Menu bar initialization failed");
+    } else {
+        // Set up menu callback
+        menuBar_->setCallback([this](MenuID id) {
+            handleMenuCommand(id);
+        });
+    }
+#endif
+
     // Load config
     loadConfig();
 
@@ -138,6 +169,13 @@ void Game::processFrame() {
         running_ = false;
         return;
     }
+
+#ifdef _WIN32
+    // Update asset viewer window if open
+    if (assetViewer_ && assetViewer_->isOpen()) {
+        assetViewer_->update();
+    }
+#endif
 
     // Get current state
     GameState* state = getCurrentState();
@@ -222,12 +260,21 @@ void Game::shutdown() {
     }
 
     // Shutdown subsystems in reverse order
+#ifdef _WIN32
+    assetViewer_.reset();
+    menuBar_.reset();
+#endif
+    textRenderer_.reset();
     assetCache_.reset();
     input_.reset();
     audio_.reset();
     renderer_.reset();
 
     SDL_Quit();
+
+#ifdef _WIN32
+    CoUninitialize();
+#endif
 }
 
 void Game::pushState(std::unique_ptr<GameState> state) {
@@ -273,14 +320,14 @@ bool Game::detectGame() {
     std::vector<std::string> searchPaths = {
         ".",
         "./SSGWIN32",
+        "C:/ggng/iso",
         "C:/GOG Games/Super Solvers Gizmos and Gadgets",
         "C:/Program Files (x86)/Steam/steamapps/common/Super Solvers Gizmos and Gadgets",
         "C:/Program Files/TLC/Gizmos & Gadgets",
     };
 
-    // Key files that must exist
+    // Key files that must exist (just need the assets, not the original exe)
     std::vector<std::string> requiredFiles = {
-        "SSGWIN32.EXE",
         "SSGWINCD/GIZMO.DAT",
     };
 
@@ -300,14 +347,16 @@ bool Game::detectGame() {
         }
     }
 
-    // Game not found - show dialog
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Game Not Found",
-        "Could not locate Super Solvers: Gizmos & Gadgets installation.\n\n"
-        "Please ensure you have a legitimate copy of the game installed,\n"
-        "or specify the game path in the configuration file.",
+    // Game not found - run in demo mode
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Demo Mode",
+        "Original game files not found.\n\n"
+        "Running in DEMO MODE with placeholder graphics.\n"
+        "To play with real assets, install the original game\n"
+        "or use: opengg.exe --path \"C:\\path\\to\\game\"",
         nullptr);
 
-    return false;
+    config_.gamePath = ".";  // Use current directory as placeholder
+    return true;  // Allow running in demo mode
 }
 
 bool Game::loadConfig() {
@@ -366,5 +415,172 @@ bool Game::saveConfig() {
 
     return true;
 }
+
+#ifdef _WIN32
+bool Game::browseForGameFolder() {
+    HWND hwnd = menuBar_ ? menuBar_->getHWND() : nullptr;
+
+    // Use IFileDialog for modern folder picker (Vista+)
+    IFileDialog* pFileDialog = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                   IID_IFileDialog, reinterpret_cast<void**>(&pFileDialog));
+
+    if (FAILED(hr)) {
+        SDL_Log("Failed to create file dialog");
+        return false;
+    }
+
+    // Set options for folder selection
+    DWORD options;
+    pFileDialog->GetOptions(&options);
+    pFileDialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+
+    // Set title
+    pFileDialog->SetTitle(L"Select Gizmos & Gadgets Installation Folder");
+
+    // Show the dialog
+    hr = pFileDialog->Show(hwnd);
+
+    if (SUCCEEDED(hr)) {
+        IShellItem* pItem = nullptr;
+        hr = pFileDialog->GetResult(&pItem);
+
+        if (SUCCEEDED(hr)) {
+            PWSTR pszPath = nullptr;
+            hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+
+            if (SUCCEEDED(hr)) {
+                // Convert wide string to std::string
+                int size = WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, nullptr, 0, nullptr, nullptr);
+                std::string selectedPath(size - 1, '\0');
+                WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, &selectedPath[0], size, nullptr, nullptr);
+
+                CoTaskMemFree(pszPath);
+
+                SDL_Log("Selected folder: %s", selectedPath.c_str());
+
+                // Validate the folder contains game files
+                std::vector<std::string> possiblePaths = {
+                    selectedPath + "/SSGWINCD/GIZMO.DAT",
+                    selectedPath + "/GIZMO.DAT",
+                    selectedPath + "/SSGWINCD/GIZMO256.DAT",
+                    selectedPath + "/GIZMO256.DAT",
+                };
+
+                bool found = false;
+                for (const auto& testPath : possiblePaths) {
+                    if (fs::exists(testPath)) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    // Valid game folder - update config
+                    config_.gamePath = selectedPath;
+                    saveConfig();
+
+                    // Reinitialize asset cache with new path
+                    if (assetCache_) {
+                        assetCache_->initialize(config_.gamePath, config_.cachePath);
+                        assetCache_->setRenderer(renderer_->getSDLRenderer());
+                    }
+
+                    SDL_Window* sdlWindow = renderer_ ? renderer_->getSDLWindow() : nullptr;
+                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Success",
+                        ("Game files found!\n\nPath: " + selectedPath +
+                         "\n\nThe game will now use these files.").c_str(), sdlWindow);
+
+                    pItem->Release();
+                    pFileDialog->Release();
+                    return true;
+                } else {
+                    SDL_Window* sdlWindow = renderer_ ? renderer_->getSDLWindow() : nullptr;
+                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Invalid Folder",
+                        "Could not find Gizmos & Gadgets files in the selected folder.\n\n"
+                        "Please select a folder containing GIZMO.DAT or the SSGWINCD subfolder.",
+                        sdlWindow);
+                }
+            }
+            pItem->Release();
+        }
+    }
+
+    pFileDialog->Release();
+    return false;
+}
+
+void Game::handleMenuCommand(int menuId) {
+    switch (menuId) {
+        // File menu
+        case ID_FILE_NEW_GAME:
+            if (onNewGame_) onNewGame_();
+            break;
+        case ID_FILE_SAVE:
+            SDL_Log("Menu: Save");
+            // TODO: Implement save
+            break;
+        case ID_FILE_SAVE_AS:
+            SDL_Log("Menu: Save As");
+            // TODO: Implement save as
+            break;
+        case ID_FILE_LOAD:
+            SDL_Log("Menu: Load");
+            // TODO: Implement load
+            break;
+        case ID_FILE_EXIT:
+            quit();
+            break;
+
+        // Config menu
+        case ID_CONFIG_LOAD_GG_FILES:
+            browseForGameFolder();
+            break;
+        case ID_CONFIG_CONTROLS:
+            SDL_Log("Menu: Controls");
+            // TODO: Show controls dialog
+            break;
+        case ID_CONFIG_SCALING:
+            SDL_Log("Menu: Scaling");
+            // TODO: Show scaling options
+            break;
+
+        // Debug menu
+        case ID_DEBUG_ASSET_VIEWER:
+            if (!assetViewer_) {
+                assetViewer_ = std::make_unique<AssetViewerWindow>();
+            }
+            assetViewer_->show(menuBar_->getHWND(), assetCache_.get(), renderer_->getSDLRenderer());
+            break;
+        case ID_DEBUG_MAP_VIEWER:
+            SDL_Log("Menu: Map Viewer");
+            // TODO: Open map viewer
+            break;
+        case ID_DEBUG_PUZZLE_DEBUGGER:
+            SDL_Log("Menu: Puzzle Debugger");
+            // TODO: Open puzzle debugger
+            break;
+        case ID_DEBUG_SAVE_EDITOR:
+            SDL_Log("Menu: Save Editor");
+            // TODO: Open save editor
+            break;
+
+        // About menu
+        case ID_ABOUT_INFO:
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About OpenGizmos",
+                "OpenGizmos v0.1.0\n\n"
+                "A modern reimplementation of Super Solvers: Gizmos & Gadgets\n\n"
+                "This is an open-source project that requires the original game files.\n"
+                "No copyrighted assets are included.\n\n"
+                "https://github.com/sp00nznet/OpenGizmos",
+                renderer_ ? renderer_->getSDLWindow() : nullptr);
+            break;
+
+        default:
+            SDL_Log("Unknown menu command: %d", menuId);
+            break;
+    }
+}
+#endif
 
 } // namespace opengg

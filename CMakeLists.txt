@@ -31,6 +31,7 @@ set(LOADER_SOURCES
     src/loader/grp_archive.cpp
     src/loader/smacker.cpp
     src/loader/asset_cache.cpp
+    src/loader/sprite_decoder.cpp
 )
 
 set(ENGINE_SOURCES
@@ -38,6 +39,9 @@ set(ENGINE_SOURCES
     src/engine/audio.cpp
     src/engine/input.cpp
     src/engine/game_loop.cpp
+    src/engine/font.cpp
+    src/engine/menu.cpp
+    src/engine/asset_viewer.cpp
 )
 
 set(GAME_SOURCES
@@ -76,6 +80,12 @@ if(WIN32)
         NOMINMAX
         WIN32_LEAN_AND_MEAN
         SDL_MAIN_HANDLED
+    )
+    # Link Windows libraries for menu and file dialogs
+    target_link_libraries(opengg PRIVATE
+        ole32
+        shell32
+        uuid
     )
 endif()
 

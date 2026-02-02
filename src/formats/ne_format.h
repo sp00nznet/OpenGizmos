@@ -71,26 +71,26 @@ struct NEResourceTypeInfo {
 
 struct NEResourceNameInfo {
     uint16_t offset;        // Offset in alignment units from start of file
-    uint16_t length;        // Length in bytes
+    uint16_t length;        // Length in alignment units (same as offset)
     uint16_t flags;
     uint16_t id;            // Resource ID (high bit = integer ID)
     uint32_t reserved;
 };
 #pragma pack(pop)
 
-// Standard resource type IDs
-constexpr uint16_t RT_CURSOR       = 0x8001;
-constexpr uint16_t RT_BITMAP       = 0x8002;
-constexpr uint16_t RT_ICON         = 0x8003;
-constexpr uint16_t RT_MENU         = 0x8004;
-constexpr uint16_t RT_DIALOG       = 0x8005;
-constexpr uint16_t RT_STRING       = 0x8006;
-constexpr uint16_t RT_FONTDIR      = 0x8007;
-constexpr uint16_t RT_FONT         = 0x8008;
-constexpr uint16_t RT_ACCELERATOR  = 0x8009;
-constexpr uint16_t RT_RCDATA       = 0x800A;
-constexpr uint16_t RT_GROUP_CURSOR = 0x800C;
-constexpr uint16_t RT_GROUP_ICON   = 0x800E;
+// Standard NE resource type IDs (prefixed to avoid Windows.h conflicts)
+constexpr uint16_t NE_RT_CURSOR       = 0x8001;
+constexpr uint16_t NE_RT_BITMAP       = 0x8002;
+constexpr uint16_t NE_RT_ICON         = 0x8003;
+constexpr uint16_t NE_RT_MENU         = 0x8004;
+constexpr uint16_t NE_RT_DIALOG       = 0x8005;
+constexpr uint16_t NE_RT_STRING       = 0x8006;
+constexpr uint16_t NE_RT_FONTDIR      = 0x8007;
+constexpr uint16_t NE_RT_FONT         = 0x8008;
+constexpr uint16_t NE_RT_ACCELERATOR  = 0x8009;
+constexpr uint16_t NE_RT_RCDATA       = 0x800A;
+constexpr uint16_t NE_RT_GROUP_CURSOR = 0x800C;
+constexpr uint16_t NE_RT_GROUP_ICON   = 0x800E;
 
 // Magic values
 constexpr uint16_t DOS_MAGIC = 0x5A4D;  // 'MZ'

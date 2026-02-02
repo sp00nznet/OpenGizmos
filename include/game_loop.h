@@ -12,6 +12,9 @@ class Renderer;
 class AudioSystem;
 class InputSystem;
 class AssetCache;
+class TextRenderer;
+class MenuBar;
+class AssetViewerWindow;
 
 // Game state interface
 class GameState {
@@ -64,6 +67,10 @@ public:
     AudioSystem* getAudio() { return audio_.get(); }
     InputSystem* getInput() { return input_.get(); }
     AssetCache* getAssetCache() { return assetCache_.get(); }
+    TextRenderer* getTextRenderer() { return textRenderer_.get(); }
+#ifdef _WIN32
+    MenuBar* getMenuBar() { return menuBar_.get(); }
+#endif
 
     // Game control
     void quit() { running_ = false; }
@@ -82,12 +89,20 @@ public:
     void setPaused(bool paused) { paused_ = paused; }
     bool isPaused() const { return paused_; }
 
+    // Menu callbacks
+    void setNewGameCallback(std::function<void()> callback) { onNewGame_ = callback; }
+    void setAssetViewerCallback(std::function<void()> callback) { onAssetViewer_ = callback; }
+
 private:
     void processFrame();
     void updateTiming();
     bool detectGame();
     bool loadConfig();
     bool saveConfig();
+#ifdef _WIN32
+    void handleMenuCommand(int menuId);
+    bool browseForGameFolder();
+#endif
 
     GameConfig config_;
 
@@ -96,6 +111,11 @@ private:
     std::unique_ptr<AudioSystem> audio_;
     std::unique_ptr<InputSystem> input_;
     std::unique_ptr<AssetCache> assetCache_;
+    std::unique_ptr<TextRenderer> textRenderer_;
+#ifdef _WIN32
+    std::unique_ptr<MenuBar> menuBar_;
+    std::unique_ptr<AssetViewerWindow> assetViewer_;
+#endif
 
     // State stack
     std::vector<std::unique_ptr<GameState>> stateStack_;
@@ -115,6 +135,10 @@ private:
     // Control
     bool running_ = false;
     bool paused_ = false;
+
+    // Menu callbacks
+    std::function<void()> onNewGame_;
+    std::function<void()> onAssetViewer_;
 };
 
 } // namespace opengg

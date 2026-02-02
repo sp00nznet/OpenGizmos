@@ -19,6 +19,7 @@ namespace opengg {
 class NEResourceExtractor;
 class GrpArchive;
 struct Sprite;
+struct Resource;
 
 // Asset types
 enum class AssetType {
@@ -104,6 +105,25 @@ public:
 
     // Get last error
     std::string getLastError() const { return lastError_; }
+
+    // Get game path
+    std::string getGamePath() const { return gamePath_; }
+
+    // List resources in an NE file (for asset viewer)
+    // Returns pairs of (display_name, info_string)
+    std::vector<std::pair<std::string, std::string>> listNEResources(const std::string& filename);
+
+    // Get raw Resource objects from NE file (for asset viewer preview)
+    std::vector<Resource> getNEResourceList(const std::string& filename);
+
+    // List files in a GRP archive (for asset viewer)
+    std::vector<std::string> listGRPFiles(const std::string& filename);
+
+    // Get raw resource data for preview
+    std::vector<uint8_t> getRawResource(const std::string& filename, uint16_t type, uint16_t id);
+
+    // Create texture from bitmap resource data (for preview)
+    SDL_Texture* createTextureFromBitmap(const std::vector<uint8_t>& bitmapData, int* outWidth = nullptr, int* outHeight = nullptr);
 
     // Asset ID helpers
     static std::string makeAssetId(const std::string& source, const std::string& type, int id);

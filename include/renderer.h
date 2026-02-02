@@ -117,6 +117,12 @@ public:
     void setWindowScale(int scale);
     int getWindowScale() const { return scale_; }
 
+    // Coordinate conversion (screen to game coordinates)
+    void screenToGame(int screenX, int screenY, int& gameX, int& gameY) const {
+        gameX = screenX / scale_;
+        gameY = screenY / scale_;
+    }
+
     // Frame control
     void beginFrame();
     void endFrame();
