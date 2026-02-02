@@ -94,6 +94,11 @@ void MenuBar::createMenus() {
     AppendMenuW(debugMenu_, MF_STRING, ID_DEBUG_SAVE_EDITOR, L"&Save Editor");
     AppendMenuW(debugMenu_, MF_SEPARATOR, 0, nullptr);
 
+    // Game launch options
+    AppendMenuW(debugMenu_, MF_STRING, ID_DEBUG_LAUNCH_NEPTUNE, L"Launch Operation &Neptune");
+    AppendMenuW(debugMenu_, MF_STRING, ID_DEBUG_LAUNCH_LABYRINTH, L"Launch &Labyrinth Test");
+    AppendMenuW(debugMenu_, MF_SEPARATOR, 0, nullptr);
+
     // === Bot Submenu ===
     botMenu_ = CreatePopupMenu();
     AppendMenuW(botMenu_, MF_STRING, ID_DEBUG_BOT_ENABLE, L"&Enable Bot");

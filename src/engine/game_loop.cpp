@@ -5,6 +5,7 @@
 #include "asset_cache.h"
 #include "font.h"
 #include "bot/bot_manager.h"
+#include "neptune/neptune_game.h"
 #ifdef _WIN32
 #include "menu.h"
 #include "asset_viewer.h"
@@ -582,6 +583,16 @@ void Game::handleMenuCommand(int menuId) {
         case ID_DEBUG_SAVE_EDITOR:
             SDL_Log("Menu: Save Editor");
             // TODO: Open save editor
+            break;
+
+        // Game launch
+        case ID_DEBUG_LAUNCH_NEPTUNE:
+            SDL_Log("Menu: Launch Operation Neptune");
+            changeState(std::make_unique<NeptuneGameState>(this));
+            break;
+        case ID_DEBUG_LAUNCH_LABYRINTH:
+            SDL_Log("Menu: Launch Labyrinth Test");
+            pushState(std::make_unique<LabyrinthGameState>(this, 1));
             break;
 
         // Bot submenu

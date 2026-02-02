@@ -29,6 +29,10 @@ enum MenuID {
     ID_DEBUG_PUZZLE_DEBUGGER,
     ID_DEBUG_SAVE_EDITOR,
 
+    // Game launch (under Debug)
+    ID_DEBUG_LAUNCH_NEPTUNE = 3050,
+    ID_DEBUG_LAUNCH_LABYRINTH,
+
     // Bot submenu (under Debug)
     ID_DEBUG_BOT_ENABLE = 3100,
     ID_DEBUG_BOT_DISABLE,
