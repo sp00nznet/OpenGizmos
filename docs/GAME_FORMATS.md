@@ -204,27 +204,49 @@ Room data appears to be a tilemap with tile type indices (0x00-0x1F range).
 ### Operation Neptune Labyrinth Format
 Each labyrinth RSC contains:
 - Small resources (1536 bytes): Doubled-byte palette (768 RGB values stored as 16-bit)
-- Large resources: RLE-compressed tile maps
+- Large tilemap resources (130KB-260KB): 640x480 RLE-compressed screen images
+- Sprite resources: Tile/object sprites (39-43 sprites per resource)
 
-**Map Header (0x00-0x1F):**
+**Tilemap Header (Resources 63968, 63978, 63988, 63998):**
 ```
 Offset  Size  Description
 0x00    2     Version (0x0001)
 0x02    2     Type (0x0001)
 0x04    2     Flags (0x0008)
 0x06    2     Unknown (0x000F)
-0x08    2     Unknown (0x0001)
-0x16    2     Unknown (0x0002)
-0x1E    2     Decompressed size indicator
+0x08-0x1F     Reserved/zeros
+0x20    4     Separator (0xFFFF0000)
+0x24    2     Unknown (0x0004)
+0x26    2     Width (0x0280 = 640)
+0x28    2     Height (0x01E0 = 480)
+0x2A+   var   RLE-compressed pixel data
+```
+
+**Sprite Resources (63969, 63970):**
+```
+Offset  Size  Description
+0x00    2     Version (0x0001)
+0x02    2     Sprite count (39 or 43)
+0x04    10    Flags/reserved
+0x0E    N     Offset table (4 bytes per sprite)
 ```
 
 **RLE Compression Format:**
 ```
-FF XX YY     - Repeat tile XX for YY+1 times
-NN           - Literal tile (if NN != 0xFF)
+FF XX YY     - Repeat pixel XX for YY+1 times
+00           - Row terminator (sprite RLE only)
+NN           - Literal pixel (if NN != 0xFF and NN != 0x00)
 ```
 
-**Tile IDs vary per labyrinth level**, suggesting each level uses its own tileset.
+**Verified Labyrinth Resources:**
+| Resource | Type | Size | Content |
+|----------|------|------|---------|
+| 63968 | tilemap | 640x480 | Labyrinth 1 background |
+| 63969 | sprites | 39 sprites | Labyrinth 1 tiles |
+| 63970 | sprites | 43 sprites | Labyrinth 1 objects |
+| 63978 | tilemap | 640x480 | Labyrinth transition |
+| 63988 | tilemap | 640x480 | Labyrinth 2 background |
+| 63998 | tilemap | 640x480 | Labyrinth 2 variation |
 
 ## Puzzle Types (SSG)
 
