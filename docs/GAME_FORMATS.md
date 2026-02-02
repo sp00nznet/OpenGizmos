@@ -93,6 +93,31 @@ DATA/
 └── *.SMK          - Smacker video files
 ```
 
+### Operation Neptune (ONWINCD)
+```
+ONWINCD/
+├── SORTER.RSC     - Sorting puzzle sprites/data (NE, CUSTOM_32513/32514/32515)
+├── COMMON.RSC     - Common assets + WAV audio (NE, custom types)
+├── LABRNTH1.RSC   - Labyrinth level 1 maps (NE, custom types)
+├── LABRNTH2.RSC   - Labyrinth level 2 maps (NE, custom types)
+├── OT3.RSC        - Additional game data (NE, custom types)
+├── READER1.RSC    - Reader puzzle data (NE)
+├── READER2.RSC    - Reader puzzle data (NE)
+├── AUTORUN.RSC    - Autorun/startup (NE)
+├── WS*.GRP        - GRP archives containing WAV audio wrappers
+└── WSCOMMON.GRP   - Common audio (GRP wrapper around single WAV)
+```
+
+**Key Observations for Operation Neptune:**
+- Uses NE format like other TLC games
+- SORTER.RSC uses standard CUSTOM_32513/32514/32515 types
+- Other RSC files use different custom type IDs (0x79xx range):
+  - Type 63968 (0xF9E0): Map/sprite data
+  - Type 63978 (0xF9EA): Map data
+  - Types 64168-64203: WAV audio resources
+- Palette stored as doubled bytes (16-bit format) in map RSC files
+- GRP files are simple WAV wrappers, not complex archives like Spellbound Wizards
+
 ## Sprite Format (Common)
 
 ### Header Structure (CUSTOM_32513)
@@ -129,6 +154,31 @@ Room data contains entity ID tables (16-bit values) terminated by 0xFFFF.
 
 ### TMS Format (tilemap)
 Room data appears to be a tilemap with tile type indices (0x00-0x1F range).
+
+### Operation Neptune Labyrinth Format
+Each labyrinth RSC contains:
+- Small resources (1536 bytes): Doubled-byte palette (768 RGB values stored as 16-bit)
+- Large resources: RLE-compressed tile maps
+
+**Map Header (0x00-0x1F):**
+```
+Offset  Size  Description
+0x00    2     Version (0x0001)
+0x02    2     Type (0x0001)
+0x04    2     Flags (0x0008)
+0x06    2     Unknown (0x000F)
+0x08    2     Unknown (0x0001)
+0x16    2     Unknown (0x0002)
+0x1E    2     Decompressed size indicator
+```
+
+**RLE Compression Format:**
+```
+FF XX YY     - Repeat tile XX for YY+1 times
+NN           - Literal tile (if NN != 0xFF)
+```
+
+**Tile IDs vary per labyrinth level**, suggesting each level uses its own tileset.
 
 ## Puzzle Types (SSG)
 
