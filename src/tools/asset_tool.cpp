@@ -12,6 +12,60 @@
 namespace fs = std::filesystem;
 using namespace opengg;
 
+// Helper function to load palette from either raw .pal file (1024 bytes) or BMP with embedded palette
+bool loadPalette(const std::string& palettePath, uint8_t palette[256][4]) {
+    std::ifstream palFile(palettePath, std::ios::binary | std::ios::ate);
+    if (!palFile) {
+        // Use grayscale fallback
+        std::cerr << "Warning: Could not load palette from " << palettePath << ", using grayscale\n";
+        for (int i = 0; i < 256; ++i) {
+            palette[i][0] = palette[i][1] = palette[i][2] = i;
+            palette[i][3] = 0;
+        }
+        return false;
+    }
+
+    auto fileSize = palFile.tellg();
+    palFile.seekg(0);
+
+    // Check if it's a BMP file (starts with "BM")
+    char magic[2];
+    palFile.read(magic, 2);
+
+    if (magic[0] == 'B' && magic[1] == 'M') {
+        // BMP file - seek past header to palette
+        palFile.seekg(54);
+        palFile.read(reinterpret_cast<char*>(palette), 1024);
+        std::cout << "Loaded palette from BMP: " << palettePath << "\n";
+    } else if (fileSize == 1024) {
+        // Raw 1024-byte palette file
+        palFile.seekg(0);
+        palFile.read(reinterpret_cast<char*>(palette), 1024);
+        std::cout << "Loaded raw palette: " << palettePath << "\n";
+    } else if (fileSize >= 768) {
+        // Possibly RGB palette (768 bytes = 256 * 3)
+        palFile.seekg(0);
+        uint8_t rgb[768];
+        palFile.read(reinterpret_cast<char*>(rgb), 768);
+        for (int i = 0; i < 256; ++i) {
+            palette[i][0] = rgb[i * 3 + 2];  // B
+            palette[i][1] = rgb[i * 3 + 1];  // G
+            palette[i][2] = rgb[i * 3 + 0];  // R
+            palette[i][3] = 0;
+        }
+        std::cout << "Loaded RGB palette: " << palettePath << "\n";
+    } else {
+        std::cerr << "Warning: Unknown palette format (size=" << fileSize << "), using grayscale\n";
+        for (int i = 0; i < 256; ++i) {
+            palette[i][0] = palette[i][1] = palette[i][2] = i;
+            palette[i][3] = 0;
+        }
+        return false;
+    }
+
+    return true;
+}
+
 void printUsage(const char* progName) {
     std::cout << "OpenGizmos Asset Tool\n\n";
     std::cout << "Usage: " << progName << " <command> [options]\n\n";
@@ -495,19 +549,9 @@ void extractSprite(const std::string& path, const std::string& palettePath, uint
         return;
     }
 
-    // Load palette from AUTO256.BMP
-    std::ifstream palFile(palettePath, std::ios::binary);
+    // Load palette
     uint8_t palette[256][4] = {};
-    if (palFile) {
-        palFile.seekg(54);  // Skip BMP header
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-        std::cout << "Loaded palette from " << palettePath << "\n";
-    } else {
-        std::cerr << "Warning: Could not load palette, using grayscale\n";
-        for (int i = 0; i < 256; ++i) {
-            palette[i][0] = palette[i][1] = palette[i][2] = i;
-        }
-    }
+    loadPalette(palettePath, palette);
 
     // Read sprite data
     file.seekg(offset);
@@ -657,18 +701,8 @@ void extractAllSprites(const std::string& datPath, const std::string& palettePat
     }
 
     // Load palette
-    std::ifstream palFile(palettePath, std::ios::binary);
     uint8_t palette[256][4] = {};
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-        std::cout << "Loaded palette from " << palettePath << "\n";
-    } else {
-        std::cerr << "Warning: Could not load palette\n";
-        for (int i = 0; i < 256; ++i) {
-            palette[i][0] = palette[i][1] = palette[i][2] = static_cast<uint8_t>(i);
-        }
-    }
+    loadPalette(palettePath, palette);
 
     // Create output directory
     fs::create_directories(outDir);
@@ -942,13 +976,8 @@ void extractRealSprites(const std::string& datPath, const std::string& palettePa
     }
 
     // Load palette
-    std::ifstream palFile(palettePath, std::ios::binary);
     uint8_t palette[256][4] = {};
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-        std::cout << "Loaded palette\n";
-    }
+    loadPalette(palettePath, palette);
 
     fs::create_directories(outDir);
 
@@ -2521,17 +2550,7 @@ void extractSpritesV2(const std::string& datPath, const std::string& palettePath
 
     // Load palette
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-        std::cout << "Loaded palette from " << palettePath << "\n";
-    } else {
-        std::cerr << "Warning: Could not load palette, using grayscale\n";
-        for (int i = 0; i < 256; ++i) {
-            palette[i][0] = palette[i][1] = palette[i][2] = i;
-        }
-    }
+    loadPalette(palettePath, palette);
 
     fs::create_directories(outDir);
 
@@ -2755,11 +2774,7 @@ void extractSpritesRaw(const std::string& datPath, const std::string& palettePat
 
     // Load palette
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     fs::create_directories(outDir);
 
@@ -2892,11 +2907,7 @@ void testDimensions(const std::string& datPath, const std::string& palettePath, 
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     fs::create_directories(outDir);
 
@@ -2995,11 +3006,7 @@ void findWidth(const std::string& datPath, const std::string& palettePath, const
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     fs::create_directories(outDir);
 
@@ -3089,11 +3096,7 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     NEResourceExtractor ne;
     if (!ne.open(datPath)) {
@@ -3258,11 +3261,7 @@ void testRLEFormats(const std::string& datPath, const std::string& palettePath,
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     fs::create_directories(outDir);
 
@@ -3720,11 +3719,7 @@ void extractWithDims(const std::string& datPath, const std::string& palettePath,
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(32768);  // Larger buffer for big sprites
@@ -3809,11 +3804,7 @@ void extractExplicitDims(const std::string& datPath, const std::string& paletteP
     if (!file) return;
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);
@@ -3912,11 +3903,7 @@ void extractBoundedRLE(const std::string& datPath, const std::string& palettePat
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(dataSize);
@@ -4032,11 +4019,7 @@ void extractSkipRLE(const std::string& datPath, const std::string& palettePath,
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);
@@ -4151,11 +4134,7 @@ void extractCleanRLE(const std::string& datPath, const std::string& palettePath,
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);
@@ -4257,11 +4236,7 @@ void extractRowBasedRLE(const std::string& datPath, const std::string& palettePa
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);
@@ -4397,11 +4372,7 @@ void extractRLETransparency(const std::string& datPath, const std::string& palet
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);
@@ -4523,11 +4494,7 @@ void extractRLELiteralCount(const std::string& datPath, const std::string& palet
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);
@@ -4650,11 +4617,7 @@ void extractSingleSprite(const std::string& datPath, const std::string& paletteP
     }
 
     uint8_t palette[256][4] = {};
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54);
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-    }
+    loadPalette(palettePath, palette);
 
     file.seekg(offset);
     std::vector<uint8_t> data(4096);

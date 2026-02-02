@@ -6,10 +6,12 @@
 #include <functional>
 
 // Forward declarations
-class Game;
-class InputSystem;
-class Room;
-class Player;
+namespace opengg {
+    class Game;
+    class InputSystem;
+    class Room;
+    class Player;
+}
 
 namespace Bot {
 
@@ -75,17 +77,17 @@ public:
     virtual ~GameBot() = default;
 
     // Core bot interface
-    virtual void initialize(Game* game) = 0;
+    virtual void initialize(opengg::Game* game) = 0;
     virtual void shutdown() = 0;
     virtual void update(float deltaTime) = 0;
 
     // Decision making
     virtual BotDecision getNextDecision() = 0;
-    virtual void executeDecision(BotDecision decision, InputSystem* input) = 0;
+    virtual void executeDecision(BotDecision decision, opengg::InputSystem* input) = 0;
 
     // State analysis
     virtual void analyzeGameState() = 0;
-    virtual void onRoomChanged(Room* newRoom) = 0;
+    virtual void onRoomChanged(opengg::Room* newRoom) = 0;
     virtual void onPuzzleStarted(int puzzleType) = 0;
     virtual void onPuzzleEnded(bool success) = 0;
 
@@ -100,7 +102,7 @@ public:
 
 protected:
     BotMode mode_ = BotMode::Disabled;
-    Game* game_ = nullptr;
+    opengg::Game* game_ = nullptr;
     float decisionCooldown_ = 0.0f;
     static constexpr float MIN_DECISION_INTERVAL = 0.1f; // 100ms between decisions
 };
@@ -111,7 +113,7 @@ public:
     static BotManager& getInstance();
 
     // Lifecycle
-    void initialize(Game* game);
+    void initialize(opengg::Game* game);
     void shutdown();
     void update(float deltaTime);
 
@@ -130,15 +132,15 @@ public:
     const BotState& getState() const { return state_; }
 
     // Input injection - bot decisions become input
-    void injectInput(InputSystem* input);
-    void executeDecision(InputSystem* input) { injectInput(input); }
+    void injectInput(opengg::InputSystem* input);
+    void executeDecision(opengg::InputSystem* input) { injectInput(input); }
 
     // Convenience methods for status
     std::string getStatusText() const;
     float getCompletionProgress() const;
 
     // Event callbacks
-    void onRoomChanged(Room* newRoom);
+    void onRoomChanged(opengg::Room* newRoom);
     void onPuzzleStarted(int puzzleType);
     void onPuzzleEnded(bool success);
     void onPlayerDied();
@@ -160,7 +162,7 @@ private:
 
     void createBotForGameType(GameType type);
 
-    Game* game_ = nullptr;
+    opengg::Game* game_ = nullptr;
     std::unique_ptr<GameBot> currentBot_;
     BotState state_;
     StatusCallback statusCallback_;

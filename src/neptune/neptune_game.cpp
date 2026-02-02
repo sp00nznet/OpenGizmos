@@ -118,23 +118,23 @@ void NeptuneGameState::handleInput() {
 
     switch (currentSection_) {
         case NeptuneSection::Submarine: {
-            // Movement controls
+            // Movement controls (use isKeyDown for continuous movement)
             float moveX = 0, moveY = 0;
 
-            if (input->isKeyPressed(SDL_SCANCODE_LEFT) ||
-                input->isKeyPressed(SDL_SCANCODE_A)) {
+            if (input->isKeyDown(SDL_SCANCODE_LEFT) ||
+                input->isKeyDown(SDL_SCANCODE_A)) {
                 moveX = -1.0f;
             }
-            if (input->isKeyPressed(SDL_SCANCODE_RIGHT) ||
-                input->isKeyPressed(SDL_SCANCODE_D)) {
+            if (input->isKeyDown(SDL_SCANCODE_RIGHT) ||
+                input->isKeyDown(SDL_SCANCODE_D)) {
                 moveX = 1.0f;
             }
-            if (input->isKeyPressed(SDL_SCANCODE_UP) ||
-                input->isKeyPressed(SDL_SCANCODE_W)) {
+            if (input->isKeyDown(SDL_SCANCODE_UP) ||
+                input->isKeyDown(SDL_SCANCODE_W)) {
                 moveY = -1.0f;
             }
-            if (input->isKeyPressed(SDL_SCANCODE_DOWN) ||
-                input->isKeyPressed(SDL_SCANCODE_S)) {
+            if (input->isKeyDown(SDL_SCANCODE_DOWN) ||
+                input->isKeyDown(SDL_SCANCODE_S)) {
                 moveY = 1.0f;
             }
 
@@ -143,34 +143,34 @@ void NeptuneGameState::handleInput() {
             submarine_.velocityY += moveY * SubmarineState::ACCELERATION * game_->getDeltaTime();
 
             // Interaction key
-            if (input->wasKeyJustPressed(SDL_SCANCODE_SPACE) ||
-                input->wasKeyJustPressed(SDL_SCANCODE_RETURN)) {
+            if (input->isKeyPressed(SDL_SCANCODE_SPACE) ||
+                input->isKeyPressed(SDL_SCANCODE_RETURN)) {
                 // Check for nearby puzzles/interactions
             }
 
             // Toggle lights
-            if (input->wasKeyJustPressed(SDL_SCANCODE_L)) {
+            if (input->isKeyPressed(SDL_SCANCODE_L)) {
                 submarine_.lightsOn = !submarine_.lightsOn;
             }
 
             // ESC to pause/menu
-            if (input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE)) {
+            if (input->isKeyPressed(SDL_SCANCODE_ESCAPE)) {
                 changeSection(NeptuneSection::MainMenu);
             }
             break;
         }
 
         case NeptuneSection::MainMenu:
-            if (input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE) ||
-                input->wasKeyJustPressed(SDL_SCANCODE_RETURN)) {
+            if (input->isKeyPressed(SDL_SCANCODE_ESCAPE) ||
+                input->isKeyPressed(SDL_SCANCODE_RETURN)) {
                 changeSection(NeptuneSection::Submarine);
             }
             break;
 
         case NeptuneSection::Victory:
         case NeptuneSection::GameOver:
-            if (input->wasKeyJustPressed(SDL_SCANCODE_RETURN) ||
-                input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE)) {
+            if (input->isKeyPressed(SDL_SCANCODE_RETURN) ||
+                input->isKeyPressed(SDL_SCANCODE_ESCAPE)) {
                 // Return to main menu or restart
                 game_->popState();
             }
@@ -743,7 +743,7 @@ void LabyrinthGameState::handleInput() {
         playerVelY_ = 0;
     }
 
-    if (input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE)) {
+    if (input->isKeyPressed(SDL_SCANCODE_ESCAPE)) {
         game_->popState();
     }
 }
@@ -943,10 +943,10 @@ void SortingPuzzleState::render() {
 void SortingPuzzleState::handleInput() {
     InputSystem* input = game_->getInput();
 
-    int mouseX, mouseY;
-    input->getMousePosition(mouseX, mouseY);
+    int mouseX = input->getMouseX();
+    int mouseY = input->getMouseY();
 
-    if (input->wasMouseButtonJustPressed(SDL_BUTTON_LEFT)) {
+    if (input->isMouseButtonPressed(MouseButton::Left)) {
         // Check if clicking an item
         for (size_t i = 0; i < items_.size(); i++) {
             if (items_[i].sorted) continue;
@@ -967,13 +967,13 @@ void SortingPuzzleState::handleInput() {
         }
     }
 
-    if (input->isMouseButtonPressed(SDL_BUTTON_LEFT) && selectedItem_ >= 0) {
+    if (input->isMouseButtonDown(MouseButton::Left) && selectedItem_ >= 0) {
         // Drag item
         items_[selectedItem_].x = mouseX + dragOffsetX_;
         items_[selectedItem_].y = mouseY + dragOffsetY_;
     }
 
-    if (input->wasMouseButtonJustReleased(SDL_BUTTON_LEFT) && selectedItem_ >= 0) {
+    if (input->isMouseButtonReleased(MouseButton::Left) && selectedItem_ >= 0) {
         // Check if dropped in a bin
         for (size_t i = 0; i < categoryBins_.size(); i++) {
             if (mouseX >= categoryBins_[i].x &&
@@ -993,7 +993,7 @@ void SortingPuzzleState::handleInput() {
         selectedItem_ = -1;
     }
 
-    if (input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE)) {
+    if (input->isKeyPressed(SDL_SCANCODE_ESCAPE)) {
         complete_ = true;
         success_ = false;
         game_->popState();
@@ -1104,10 +1104,10 @@ void ReaderPuzzleState::render() {
 void ReaderPuzzleState::handleInput() {
     InputSystem* input = game_->getInput();
 
-    int mouseX, mouseY;
-    input->getMousePosition(mouseX, mouseY);
+    int mouseX = input->getMouseX();
+    int mouseY = input->getMouseY();
 
-    if (input->wasMouseButtonJustPressed(SDL_BUTTON_LEFT)) {
+    if (input->isMouseButtonPressed(MouseButton::Left)) {
         // Check answer button clicks
         for (size_t i = 0; i < answerButtons_.size(); i++) {
             if (mouseX >= answerButtons_[i].x &&
@@ -1121,16 +1121,16 @@ void ReaderPuzzleState::handleInput() {
     }
 
     // Keyboard shortcuts
-    if (input->wasKeyJustPressed(SDL_SCANCODE_A)) selectedAnswer_ = 0;
-    if (input->wasKeyJustPressed(SDL_SCANCODE_B)) selectedAnswer_ = 1;
-    if (input->wasKeyJustPressed(SDL_SCANCODE_C)) selectedAnswer_ = 2;
-    if (input->wasKeyJustPressed(SDL_SCANCODE_D)) selectedAnswer_ = 3;
+    if (input->isKeyPressed(SDL_SCANCODE_1)) selectedAnswer_ = 0;
+    if (input->isKeyPressed(SDL_SCANCODE_2)) selectedAnswer_ = 1;
+    if (input->isKeyPressed(SDL_SCANCODE_3)) selectedAnswer_ = 2;
+    if (input->isKeyPressed(SDL_SCANCODE_4)) selectedAnswer_ = 3;
 
-    if (input->wasKeyJustPressed(SDL_SCANCODE_RETURN) && selectedAnswer_ >= 0) {
+    if (input->isKeyPressed(SDL_SCANCODE_RETURN) && selectedAnswer_ >= 0) {
         submitAnswer();
     }
 
-    if (input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE)) {
+    if (input->isKeyPressed(SDL_SCANCODE_ESCAPE)) {
         complete_ = true;
         success_ = false;
         game_->popState();
@@ -1298,10 +1298,10 @@ void MathPuzzleState::render() {
 void MathPuzzleState::handleInput() {
     InputSystem* input = game_->getInput();
 
-    int mouseX, mouseY;
-    input->getMousePosition(mouseX, mouseY);
+    int mouseX = input->getMouseX();
+    int mouseY = input->getMouseY();
 
-    if (input->wasMouseButtonJustPressed(SDL_BUTTON_LEFT)) {
+    if (input->isMouseButtonPressed(MouseButton::Left)) {
         for (size_t i = 0; i < answerButtons_.size(); i++) {
             if (mouseX >= answerButtons_[i].x &&
                 mouseX < answerButtons_[i].x + answerButtons_[i].w &&
@@ -1315,12 +1315,12 @@ void MathPuzzleState::handleInput() {
     }
 
     // Number keys
-    if (input->wasKeyJustPressed(SDL_SCANCODE_1)) { selectedAnswer_ = 0; submitAnswer(); }
-    if (input->wasKeyJustPressed(SDL_SCANCODE_2)) { selectedAnswer_ = 1; submitAnswer(); }
-    if (input->wasKeyJustPressed(SDL_SCANCODE_3)) { selectedAnswer_ = 2; submitAnswer(); }
-    if (input->wasKeyJustPressed(SDL_SCANCODE_4)) { selectedAnswer_ = 3; submitAnswer(); }
+    if (input->isKeyPressed(SDL_SCANCODE_1)) { selectedAnswer_ = 0; submitAnswer(); }
+    if (input->isKeyPressed(SDL_SCANCODE_2)) { selectedAnswer_ = 1; submitAnswer(); }
+    if (input->isKeyPressed(SDL_SCANCODE_3)) { selectedAnswer_ = 2; submitAnswer(); }
+    if (input->isKeyPressed(SDL_SCANCODE_4)) { selectedAnswer_ = 3; submitAnswer(); }
 
-    if (input->wasKeyJustPressed(SDL_SCANCODE_ESCAPE)) {
+    if (input->isKeyPressed(SDL_SCANCODE_ESCAPE)) {
         complete_ = true;
         success_ = false;
         game_->popState();

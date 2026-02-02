@@ -17,7 +17,7 @@ NeptuneBot::NeptuneBot() {
 
 NeptuneBot::~NeptuneBot() = default;
 
-void NeptuneBot::initialize(Game* game) {
+void NeptuneBot::initialize(opengg::Game* game) {
     game_ = game;
 
     // Initialize submarine state
@@ -137,7 +137,7 @@ BotDecision NeptuneBot::getNextDecision() {
     return decideNavigation();
 }
 
-void NeptuneBot::executeDecision(BotDecision decision, InputSystem* input) {
+void NeptuneBot::executeDecision(BotDecision decision, opengg::InputSystem* input) {
     if (!input) return;
 
     // Simulate key presses based on decision
@@ -191,7 +191,7 @@ void NeptuneBot::analyzeGameState() {
     // submarine_.fuel -= 0.05f * deltaTime;   // Fuel depletes when moving
 }
 
-void NeptuneBot::onRoomChanged(Room* newRoom) {
+void NeptuneBot::onRoomChanged(opengg::Room* newRoom) {
     SDL_Log("Neptune Bot: Room changed");
 
     // Rebuild navigation for new room

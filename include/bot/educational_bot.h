@@ -52,15 +52,15 @@ public:
     ~EducationalBot() override;
 
     // GameBot interface
-    void initialize(Game* game) override;
+    void initialize(opengg::Game* game) override;
     void shutdown() override;
     void update(float deltaTime) override;
 
     BotDecision getNextDecision() override;
-    void executeDecision(BotDecision decision, InputSystem* input) override;
+    void executeDecision(BotDecision decision, opengg::InputSystem* input) override;
 
     void analyzeGameState() override;
-    void onRoomChanged(Room* newRoom) override;
+    void onRoomChanged(opengg::Room* newRoom) override;
     void onPuzzleStarted(int puzzleType) override;
     void onPuzzleEnded(bool success) override;
 

@@ -16,7 +16,7 @@ EducationalBot::EducationalBot(GameType gameType)
 
 EducationalBot::~EducationalBot() = default;
 
-void EducationalBot::initialize(Game* game) {
+void EducationalBot::initialize(opengg::Game* game) {
     game_ = game;
 
     progress_ = GameProgress();
@@ -75,7 +75,7 @@ BotDecision EducationalBot::getNextDecision() {
     }
 }
 
-void EducationalBot::executeDecision(BotDecision decision, InputSystem* input) {
+void EducationalBot::executeDecision(BotDecision decision, opengg::InputSystem* input) {
     if (!input) return;
 
     switch (decision) {
@@ -110,7 +110,7 @@ void EducationalBot::analyzeGameState() {
     progress_.completionPercent = getCompletionProgress() * 100.0f;
 }
 
-void EducationalBot::onRoomChanged(Room* newRoom) {
+void EducationalBot::onRoomChanged(opengg::Room* newRoom) {
     SDL_Log("Educational Bot: Room changed");
 
     if (newRoom) {

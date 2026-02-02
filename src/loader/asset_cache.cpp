@@ -650,16 +650,28 @@ std::vector<std::pair<std::string, std::string>> AssetCache::listNEResources(con
 
 std::vector<Resource> AssetCache::getNEResourceList(const std::string& filename) {
     // Build full path - check multiple game directories
-    std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
-    if (!fs::exists(fullPath)) {
-        // Check ONWINCD for Operation Neptune RSC files
-        fullPath = gamePath_ + "/ONWINCD/" + filename;
-        if (!fs::exists(fullPath)) {
-            fullPath = gamePath_ + "/" + filename;
-            if (!fs::exists(fullPath)) {
-                return {};
-            }
+    std::vector<std::string> searchPaths = {
+        gamePath_ + "/SSGWINCD/" + filename,      // Gizmos & Gadgets
+        gamePath_ + "/ONWINCD/" + filename,       // Operation Neptune (alternate)
+        gamePath_ + "/ONWINCD/INSTALL/" + filename, // Neptune install dir
+        gamePath_ + "/sso_extract/" + filename,   // OutNumbered
+        gamePath_ + "/ssr_extract/" + filename,   // Spellbound
+        gamePath_ + "/tms_extract/" + filename,   // Treasure MathStorm
+        gamePath_ + "/iso/SSGWINCD/" + filename,  // ISO mount paths
+        gamePath_ + "/iso/INSTALL/" + filename,
+        gamePath_ + "/" + filename                // Root fallback
+    };
+
+    std::string fullPath;
+    for (const auto& path : searchPaths) {
+        if (fs::exists(path)) {
+            fullPath = path;
+            break;
         }
+    }
+
+    if (fullPath.empty()) {
+        return {};
     }
 
     // Check if we have this file cached
@@ -704,16 +716,28 @@ std::vector<std::string> AssetCache::listGRPFiles(const std::string& filename) {
 
 std::vector<uint8_t> AssetCache::getRawResource(const std::string& filename, uint16_t type, uint16_t id) {
     // Build full path - check multiple game directories
-    std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
-    if (!fs::exists(fullPath)) {
-        // Check ONWINCD for Operation Neptune RSC files
-        fullPath = gamePath_ + "/ONWINCD/" + filename;
-        if (!fs::exists(fullPath)) {
-            fullPath = gamePath_ + "/" + filename;
-            if (!fs::exists(fullPath)) {
-                return {};
-            }
+    std::vector<std::string> searchPaths = {
+        gamePath_ + "/SSGWINCD/" + filename,      // Gizmos & Gadgets
+        gamePath_ + "/ONWINCD/" + filename,       // Operation Neptune (alternate)
+        gamePath_ + "/ONWINCD/INSTALL/" + filename, // Neptune install dir
+        gamePath_ + "/sso_extract/" + filename,   // OutNumbered
+        gamePath_ + "/ssr_extract/" + filename,   // Spellbound
+        gamePath_ + "/tms_extract/" + filename,   // Treasure MathStorm
+        gamePath_ + "/iso/SSGWINCD/" + filename,  // ISO mount paths
+        gamePath_ + "/iso/INSTALL/" + filename,
+        gamePath_ + "/" + filename                // Root fallback
+    };
+
+    std::string fullPath;
+    for (const auto& path : searchPaths) {
+        if (fs::exists(path)) {
+            fullPath = path;
+            break;
         }
+    }
+
+    if (fullPath.empty()) {
+        return {};
     }
 
     // Check if we have this file cached

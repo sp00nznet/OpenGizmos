@@ -162,32 +162,42 @@ void AssetViewerWindow::populateFileList() {
     SendMessage(fileCombo_, CB_RESETCONTENT, 0, 0);
     fileNames_.clear();
 
-    // Add known DAT and RSC files
+    // Add known DAT and RSC files with clear category labels
     fileNames_ = {
         // Gizmos & Gadgets
-        "GIZMO.DAT",
-        "GIZMO256.DAT",
-        "GIZMO16.DAT",
-        "PUZZLE.DAT",
-        "PUZ256.DAT",
-        "PUZ16.DAT",
-        "FONT.DAT",
-        "AE.DAT",
-        "AE256.DAT",
-        "AUTO.DAT",
-        "AUTO256.DAT",
-        "PLANE.DAT",
-        "PLANE256.DAT",
-        "SSGWIN.DAT",
+        "[GIZMOS] GIZMO.DAT",
+        "[GIZMOS] GIZMO256.DAT",
+        "[GIZMOS] GIZMO16.DAT",
+        "[GIZMOS] PUZZLE.DAT",
+        "[GIZMOS] PUZ256.DAT",
+        "[GIZMOS] PUZ16.DAT",
+        "[GIZMOS] FONT.DAT",
+        "[GIZMOS] AE.DAT",
+        "[GIZMOS] AE256.DAT",
+        "[GIZMOS] AUTO.DAT",
+        "[GIZMOS] AUTO256.DAT",
+        "[GIZMOS] PLANE.DAT",
+        "[GIZMOS] PLANE256.DAT",
+        "[GIZMOS] SSGWIN.DAT",
         // Operation Neptune
-        "SORTER.RSC",
-        "COMMON.RSC",
-        "LABRNTH1.RSC",
-        "LABRNTH2.RSC",
-        "READER1.RSC",
-        "READER2.RSC",
-        "OT3.RSC",
-        "AUTORUN.RSC",
+        "[NEPTUNE] SORTER.RSC",
+        "[NEPTUNE] COMMON.RSC",
+        "[NEPTUNE] LABRNTH1.RSC",
+        "[NEPTUNE] LABRNTH2.RSC",
+        "[NEPTUNE] READER1.RSC",
+        "[NEPTUNE] READER2.RSC",
+        "[NEPTUNE] OT3.RSC",
+        "[NEPTUNE] AUTORUN.RSC",
+        // OutNumbered
+        "[OUTNUMBERED] SSO1.DAT",
+        "[OUTNUMBERED] SSOWINCD.DAT",
+        "[OUTNUMBERED] SND.DAT",
+        // Spellbound
+        "[SPELLBOUND] SSR1.DAT",
+        "[SPELLBOUND] SFX.DAT",
+        "[SPELLBOUND] TASK.RSC",
+        // Treasure MathStorm
+        "[MATHSTORM] TMSDATA.DAT",
         // Raw file view mode
         "[RAW] GIZMO.DAT @ 0x80000"
     };
@@ -204,6 +214,16 @@ void AssetViewerWindow::populateFileList() {
     }
 }
 
+// Helper to strip category prefix from filename
+static std::string stripPrefix(const std::string& filename) {
+    // Strip [GIZMOS], [NEPTUNE], etc. prefixes
+    size_t pos = filename.find("] ");
+    if (pos != std::string::npos && pos < 20) {
+        return filename.substr(pos + 2);
+    }
+    return filename;
+}
+
 void AssetViewerWindow::onFileSelected() {
     if (!resourceList_ || !cache_) return;
 
@@ -211,10 +231,15 @@ void AssetViewerWindow::onFileSelected() {
     if (sel < 0 || sel >= (int)fileNames_.size()) return;
 
     selectedFile_ = sel;
-    std::string filename = fileNames_[sel];
+    std::string displayName = fileNames_[sel];
+    std::string filename = stripPrefix(displayName);
+
+    // Update window title to show current file
+    std::string title = "Asset Viewer - " + displayName;
+    SetWindowTextA(hwnd_, title.c_str());
 
     // Check if this is raw file view mode
-    if (filename.find("[RAW]") == 0) {
+    if (displayName.find("[RAW]") == 0) {
         // Raw view mode - show offset/size controls instead of resources
         SendMessage(resourceList_, LB_RESETCONTENT, 0, 0);
         resources_.clear();
@@ -350,25 +375,51 @@ void AssetViewerWindow::updateRawPreview(int preset) {
         file.read(reinterpret_cast<char*>(data.data()), data.size());
     }
 
-    // Load palette from AUTO256.BMP (game's actual 256-color palette)
+    // Load palette - try multiple sources
     uint8_t palette[256][4] = {}; // BGRA format
     bool paletteLoaded = false;
+    std::string paletteSource = "Default (colors may be wrong)";
 
-    // Try game palette first (AUTO256.BMP)
-    std::string palettePath = gamePath + "/INSTALL/AUTO256.BMP";
-    std::ifstream palFile(palettePath, std::ios::binary);
-    if (palFile) {
-        palFile.seekg(54); // Palette starts at offset 54 in BMP
-        palFile.read(reinterpret_cast<char*>(palette), 1024);
-        paletteLoaded = true;
-    } else {
-        // Fallback to SSGWINCD location
-        palettePath = gamePath + "/SSGWINCD/../INSTALL/AUTO256.BMP";
-        palFile.open(palettePath, std::ios::binary);
-        if (palFile) {
+    // List of palette files to try (in order of preference)
+    std::vector<std::string> palettePaths = {
+        gamePath + "/on_palettes/sorter_bmp.pal",      // Neptune palette
+        gamePath + "/on_palettes/common_bmp.pal",     // Common palette
+        gamePath + "/INSTALL/AUTO256.BMP",            // Game BMP palette
+        gamePath + "/SSGWINCD/../INSTALL/AUTO256.BMP" // Alternate path
+    };
+
+    for (const auto& palettePath : palettePaths) {
+        std::ifstream palFile(palettePath, std::ios::binary | std::ios::ate);
+        if (!palFile) continue;
+
+        auto fileSize = palFile.tellg();
+        palFile.seekg(0);
+
+        // Check if BMP (starts with "BM") or raw
+        char magic[2];
+        palFile.read(magic, 2);
+
+        if (magic[0] == 'B' && magic[1] == 'M') {
+            // BMP file - seek past header
             palFile.seekg(54);
             palFile.read(reinterpret_cast<char*>(palette), 1024);
             paletteLoaded = true;
+            paletteSource = palettePath;
+            break;
+        } else if (fileSize == 1024) {
+            // Raw 1024-byte palette
+            palFile.seekg(0);
+            palFile.read(reinterpret_cast<char*>(palette), 1024);
+            paletteLoaded = true;
+            paletteSource = palettePath;
+            break;
+        }
+    }
+
+    if (!paletteLoaded) {
+        // Grayscale fallback
+        for (int i = 0; i < 256; ++i) {
+            palette[i][0] = palette[i][1] = palette[i][2] = static_cast<uint8_t>(i);
         }
     }
 
@@ -379,7 +430,7 @@ void AssetViewerWindow::updateRawPreview(int preset) {
              useRLE ? "RLE" : "RAW",
              baseFile.c_str(), offset, width, height, data.size(),
              useRLE ? "RLE decompressed (FF xx count)" : "Raw palette indices",
-             paletteLoaded ? "Game palette (AUTO256.BMP)" : "Default (colors may be wrong)");
+             paletteSource.c_str());
     SetWindowTextA(infoEdit_, info);
 
     // Create preview
@@ -427,14 +478,16 @@ void AssetViewerWindow::updatePreview() {
     if (selectedResource_ >= (int)resources_.size()) return;
 
     const auto& res = resources_[selectedResource_];
-    std::string filename = fileNames_[selectedFile_];
+    std::string displayName = fileNames_[selectedFile_];
+    std::string filename = stripPrefix(displayName);
 
     // Get raw data
     auto data = cache_->getRawResource(filename, res.typeId, res.id);
     if (data.empty()) return;
 
     // Check if this is a Neptune RSC file
-    bool isNeptuneRSC = (filename.find(".RSC") != std::string::npos);
+    bool isNeptuneRSC = (filename.find(".RSC") != std::string::npos) ||
+                        (displayName.find("[NEPTUNE]") != std::string::npos);
 
     // Update info text
     std::string info = "File: " + filename + "\r\n";

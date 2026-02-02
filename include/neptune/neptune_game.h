@@ -1,12 +1,11 @@
 #pragma once
 
 #include "game_loop.h"
+#include <SDL.h>
 #include <string>
 #include <vector>
 #include <memory>
 #include <unordered_map>
-
-struct SDL_Texture;
 
 namespace opengg {
 

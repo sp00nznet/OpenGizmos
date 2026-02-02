@@ -15,7 +15,7 @@ BotManager& BotManager::getInstance() {
     return instance;
 }
 
-void BotManager::initialize(Game* game) {
+void BotManager::initialize(opengg::Game* game) {
     game_ = game;
     state_ = BotState();
     recentDecisions_.clear();
@@ -146,7 +146,7 @@ void BotManager::createBotForGameType(GameType type) {
     }
 }
 
-void BotManager::injectInput(InputSystem* input) {
+void BotManager::injectInput(opengg::InputSystem* input) {
     if (!state_.isEnabled || !currentBot_ || state_.mode == BotMode::Disabled) {
         return;
     }
@@ -162,7 +162,7 @@ void BotManager::injectInput(InputSystem* input) {
     }
 }
 
-void BotManager::onRoomChanged(Room* newRoom) {
+void BotManager::onRoomChanged(opengg::Room* newRoom) {
     if (currentBot_) {
         currentBot_->onRoomChanged(newRoom);
     }

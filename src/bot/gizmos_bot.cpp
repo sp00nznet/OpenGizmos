@@ -14,7 +14,7 @@ namespace Bot {
 GizmosBot::GizmosBot() = default;
 GizmosBot::~GizmosBot() = default;
 
-void GizmosBot::initialize(Game* game) {
+void GizmosBot::initialize(opengg::Game* game) {
     game_ = game;
 
     // Reset state
@@ -100,7 +100,7 @@ BotDecision GizmosBot::getNextDecision() {
     return decideExploration();
 }
 
-void GizmosBot::executeDecision(BotDecision decision, InputSystem* input) {
+void GizmosBot::executeDecision(BotDecision decision, opengg::InputSystem* input) {
     if (!input) return;
 
     switch (decision) {
@@ -143,7 +143,7 @@ void GizmosBot::analyzeGameState() {
     // Update Morty position
 }
 
-void GizmosBot::onRoomChanged(Room* newRoom) {
+void GizmosBot::onRoomChanged(opengg::Room* newRoom) {
     SDL_Log("Gizmos Bot: Room changed");
 
     // Mark room as explored
