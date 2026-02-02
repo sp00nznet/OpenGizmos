@@ -649,12 +649,16 @@ std::vector<std::pair<std::string, std::string>> AssetCache::listNEResources(con
 }
 
 std::vector<Resource> AssetCache::getNEResourceList(const std::string& filename) {
-    // Build full path
+    // Build full path - check multiple game directories
     std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
     if (!fs::exists(fullPath)) {
-        fullPath = gamePath_ + "/" + filename;
+        // Check ONWINCD for Operation Neptune RSC files
+        fullPath = gamePath_ + "/ONWINCD/" + filename;
         if (!fs::exists(fullPath)) {
-            return {};
+            fullPath = gamePath_ + "/" + filename;
+            if (!fs::exists(fullPath)) {
+                return {};
+            }
         }
     }
 
@@ -699,12 +703,16 @@ std::vector<std::string> AssetCache::listGRPFiles(const std::string& filename) {
 }
 
 std::vector<uint8_t> AssetCache::getRawResource(const std::string& filename, uint16_t type, uint16_t id) {
-    // Build full path
+    // Build full path - check multiple game directories
     std::string fullPath = gamePath_ + "/SSGWINCD/" + filename;
     if (!fs::exists(fullPath)) {
-        fullPath = gamePath_ + "/" + filename;
+        // Check ONWINCD for Operation Neptune RSC files
+        fullPath = gamePath_ + "/ONWINCD/" + filename;
         if (!fs::exists(fullPath)) {
-            return {};
+            fullPath = gamePath_ + "/" + filename;
+            if (!fs::exists(fullPath)) {
+                return {};
+            }
         }
     }
 

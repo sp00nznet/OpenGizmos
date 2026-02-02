@@ -162,8 +162,9 @@ void AssetViewerWindow::populateFileList() {
     SendMessage(fileCombo_, CB_RESETCONTENT, 0, 0);
     fileNames_.clear();
 
-    // Add known DAT files
+    // Add known DAT and RSC files
     fileNames_ = {
+        // Gizmos & Gadgets
         "GIZMO.DAT",
         "GIZMO256.DAT",
         "GIZMO16.DAT",
@@ -178,7 +179,17 @@ void AssetViewerWindow::populateFileList() {
         "PLANE.DAT",
         "PLANE256.DAT",
         "SSGWIN.DAT",
-        "[RAW] GIZMO.DAT @ 0x80000"  // Raw file view mode
+        // Operation Neptune
+        "SORTER.RSC",
+        "COMMON.RSC",
+        "LABRNTH1.RSC",
+        "LABRNTH2.RSC",
+        "READER1.RSC",
+        "READER2.RSC",
+        "OT3.RSC",
+        "AUTORUN.RSC",
+        // Raw file view mode
+        "[RAW] GIZMO.DAT @ 0x80000"
     };
 
     for (const auto& name : fileNames_) {
@@ -422,11 +433,26 @@ void AssetViewerWindow::updatePreview() {
     auto data = cache_->getRawResource(filename, res.typeId, res.id);
     if (data.empty()) return;
 
+    // Check if this is a Neptune RSC file
+    bool isNeptuneRSC = (filename.find(".RSC") != std::string::npos);
+
     // Update info text
     std::string info = "File: " + filename + "\r\n";
     info += "Resource: " + res.typeName + " #" + std::to_string(res.id) + "\r\n";
     info += "Size: " + std::to_string(res.size) + " bytes\r\n";
-    info += "Offset: 0x" + std::to_string(res.offset) + "\r\n\r\n";
+    info += "Offset: 0x" + std::to_string(res.offset) + "\r\n";
+
+    // Check header type for Neptune resources
+    if (isNeptuneRSC && data.size() >= 4) {
+        if (data[0] == 0x01 && data[1] == 0x00) {
+            info += "Format: Neptune LE sprite header\r\n";
+        } else if (data[0] == 0x00 && data[1] == 0x01) {
+            info += "Format: Neptune BE sprite header\r\n";
+        } else if (data.size() == 1536) {
+            info += "Format: Neptune doubled-byte palette (256 colors)\r\n";
+        }
+    }
+    info += "\r\n";
 
     // Add hex dump
     info += "Hex dump (first 128 bytes):\r\n";
@@ -451,8 +477,148 @@ void AssetViewerWindow::updatePreview() {
         previewBitmap_ = nullptr;
     }
 
-    // Parse sprite header
-    if (data.size() >= 12) {
+    // Check for Neptune sprite format
+    if (isNeptuneRSC && data.size() >= 16) {
+        // Neptune sprite header detection
+        bool isLEHeader = (data[0] == 0x01 && data[1] == 0x00);
+        bool isBEHeader = (data[0] == 0x00 && data[1] == 0x01);
+
+        if (isLEHeader || isBEHeader) {
+            // Parse sprite count
+            uint16_t spriteCount = isLEHeader
+                ? (data[2] | (data[3] << 8))
+                : (data[3]);  // BE format
+
+            if (spriteCount > 0 && spriteCount < 500) {
+                // Calculate header size and offset table position
+                size_t headerSize = isLEHeader ? 14 : 16;
+                size_t offsetTablePos = headerSize;
+
+                // Read first sprite offset
+                if (offsetTablePos + 4 <= data.size()) {
+                    uint32_t firstOffset = data[offsetTablePos] |
+                                          (data[offsetTablePos + 1] << 8) |
+                                          (data[offsetTablePos + 2] << 16) |
+                                          (data[offsetTablePos + 3] << 24);
+
+                    // Decode first sprite with RLE
+                    // Try common dimensions
+                    int testWidths[] = {64, 94, 55, 43, 80, 128, 32, 48};
+                    int bestWidth = 64, bestHeight = 64;
+
+                    // Auto-detect by counting row terminators (0x00)
+                    if (firstOffset < data.size()) {
+                        int rowCount = 0;
+                        int maxRowWidth = 0;
+                        int currentRowWidth = 0;
+
+                        for (size_t i = firstOffset; i < data.size() && rowCount < 200; ++i) {
+                            if (data[i] == 0x00) {
+                                if (currentRowWidth > maxRowWidth) {
+                                    maxRowWidth = currentRowWidth;
+                                }
+                                currentRowWidth = 0;
+                                rowCount++;
+                            } else if (data[i] == 0xFF && i + 2 < data.size()) {
+                                currentRowWidth += data[i + 2] + 1;
+                                i += 2;
+                            } else {
+                                currentRowWidth++;
+                            }
+                        }
+
+                        if (rowCount > 0 && maxRowWidth > 0) {
+                            bestWidth = maxRowWidth;
+                            bestHeight = rowCount;
+                        }
+                    }
+
+                    // Clamp to reasonable sizes
+                    bestWidth = std::min(std::max(bestWidth, 16), 256);
+                    bestHeight = std::min(std::max(bestHeight, 16), 256);
+
+                    previewWidth_ = bestWidth;
+                    previewHeight_ = bestHeight;
+                    previewPixels_.resize(bestWidth * bestHeight);
+
+                    // Fill with transparent (magenta)
+                    for (auto& p : previewPixels_) {
+                        p = 0xFFFF00FF;
+                    }
+
+                    // Decode RLE sprite
+                    int x = 0, y = 0;
+                    size_t i = firstOffset;
+
+                    while (i < data.size() && y < bestHeight) {
+                        uint8_t byte = data[i++];
+
+                        if (byte == 0x00) {
+                            // Row terminator
+                            x = 0;
+                            y++;
+                        } else if (byte == 0xFF && i + 1 < data.size()) {
+                            // RLE: FF <pixel> <count>
+                            uint8_t pixel = data[i++];
+                            uint8_t count = data[i++];
+
+                            for (int j = 0; j <= count && x < bestWidth; ++j) {
+                                if (pixel != 0) {
+                                    // Use rainbow palette for visualization
+                                    uint8_t r = ((pixel >> 5) & 7) * 36;
+                                    uint8_t g = ((pixel >> 2) & 7) * 36;
+                                    uint8_t b = (pixel & 3) * 85;
+                                    previewPixels_[y * bestWidth + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                                } else {
+                                    previewPixels_[y * bestWidth + x] = 0xFF000000;
+                                }
+                                x++;
+                            }
+                        } else {
+                            // Literal pixel
+                            if (x < bestWidth) {
+                                if (byte != 0) {
+                                    uint8_t r = ((byte >> 5) & 7) * 36;
+                                    uint8_t g = ((byte >> 2) & 7) * 36;
+                                    uint8_t b = (byte & 3) * 85;
+                                    previewPixels_[y * bestWidth + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                                } else {
+                                    previewPixels_[y * bestWidth + x] = 0xFF000000;
+                                }
+                                x++;
+                            }
+                        }
+                    }
+
+                    // Update info with detected dimensions
+                    char dimInfo[128];
+                    snprintf(dimInfo, sizeof(dimInfo),
+                            "\r\nDetected: %d sprites, first at offset 0x%X\r\n"
+                            "Auto-detected dimensions: %dx%d\r\n",
+                            spriteCount, firstOffset, bestWidth, bestHeight);
+                    info += dimInfo;
+                    SetWindowTextA(infoEdit_, info.c_str());
+
+                    // Create GDI bitmap
+                    BITMAPINFO bmi = {};
+                    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+                    bmi.bmiHeader.biWidth = bestWidth;
+                    bmi.bmiHeader.biHeight = -bestHeight;
+                    bmi.bmiHeader.biPlanes = 1;
+                    bmi.bmiHeader.biBitCount = 32;
+                    bmi.bmiHeader.biCompression = BI_RGB;
+
+                    HDC hdc = GetDC(previewStatic_);
+                    previewBitmap_ = CreateDIBitmap(hdc, &bmi.bmiHeader, CBM_INIT,
+                                                    previewPixels_.data(), &bmi, DIB_RGB_COLORS);
+                    ReleaseDC(previewStatic_, hdc);
+                }
+            }
+        }
+    }
+
+    // Fallback: Parse as Gizmos sprite header
+    if (!previewBitmap_ && data.size() >= 12) {
         uint16_t width = data[0] | (data[1] << 8);
         uint16_t height = data[2] | (data[3] << 8);
 
