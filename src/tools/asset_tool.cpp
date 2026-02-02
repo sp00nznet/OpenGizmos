@@ -3088,6 +3088,35 @@ void findWidth(const std::string& datPath, const std::string& palettePath, const
     std::cout << "Look through them to find which width shows a clear sprite!\n";
 }
 
+// Estimate dimensions by counting row terminators (0x00) in sprite data
+std::pair<int,int> estimateDimensions(const std::vector<uint8_t>& data, uint32_t startOffset, uint32_t spriteSize) {
+    // Count 0x00 bytes (row terminators) to estimate height
+    int rowCount = 0;
+    for (uint32_t i = startOffset; i < startOffset + spriteSize && i < data.size(); ++i) {
+        if (data[i] == 0x00) rowCount++;
+    }
+
+    if (rowCount == 0) return {32, 32};
+
+    // Estimate width from uncompressed size / height
+    int estimatedPixels = spriteSize * 2;  // Rough estimate (RLE typically halves size)
+    int estimatedWidth = std::max(16, std::min(256, estimatedPixels / rowCount));
+
+    // Round to common sprite widths (matching PowerShell reference)
+    static const int commonWidths[] = {16, 24, 32, 40, 48, 55, 64, 80, 94, 96, 128, 160, 192, 256};
+    int closestW = 32;
+    int minDiff = 999;
+    for (int w : commonWidths) {
+        int diff = std::abs(w - estimatedWidth);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestW = w;
+        }
+    }
+
+    return {closestW, rowCount};
+}
+
 void extractIndexedSprites(const std::string& datPath, const std::string& palettePath, const std::string& outDir) {
     uint8_t palette[256][4] = {};
     loadPalette(palettePath, palette);
@@ -3142,93 +3171,62 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
             offsets.push_back(off);
         }
 
-        // Determine dimensions
+        // Determine dimensions - same for all sprites in this resource
         int width, height;
-        auto knownIt = knownDims.find(res.id);
-        if (knownIt != knownDims.end()) {
-            width = knownIt->second.first;
-            height = knownIt->second.second;
+        if (knownDims.count(res.id)) {
+            width = knownDims[res.id].first;
+            height = knownDims[res.id].second;
         } else {
-            // Estimate dimensions by counting row terminators (0x00)
-            if (offsets.empty() || offsets[0] >= data.size()) continue;
-
-            uint32_t firstOff = offsets[0];
-            uint32_t spriteSize = (spriteCount > 1 && offsets[1] > firstOff)
-                                  ? (offsets[1] - firstOff)
-                                  : (data.size() - firstOff);
-
-            int rowCount = 0;
-            for (size_t i = firstOff; i < firstOff + spriteSize && i < data.size(); ++i) {
-                if (data[i] == 0x00) rowCount++;
-            }
-
-            if (rowCount < 4) continue;
-            height = rowCount;
-
-            // Estimate width based on data density
-            int estWidth = std::max(16, std::min(256, (int)(spriteSize * 2 / rowCount)));
-            // Round to common sizes
-            int commonWidths[] = {16, 24, 32, 40, 48, 55, 64, 80, 94, 96, 128};
-            width = 32;
-            int minDiff = 9999;
-            for (int cw : commonWidths) {
-                int diff = std::abs(cw - estWidth);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    width = cw;
-                }
-            }
+            // Estimate from first sprite
+            uint32_t firstOffset = offsets[0];
+            uint32_t spriteSize = (offsets.size() > 1) ? offsets[1] - firstOffset : data.size() - firstOffset;
+            auto dims = estimateDimensions(data, firstOffset, spriteSize);
+            width = dims.first;
+            height = dims.second;
         }
-
-        if (width * height > 65536) continue;
-        int totalPixels = width * height;
 
         // Extract each sprite frame
         for (size_t frameIdx = 0; frameIdx < offsets.size(); ++frameIdx) {
             uint32_t offset = offsets[frameIdx];
             if (offset >= data.size()) continue;
 
-            // Decompress RLE:
-            // FF <value> <count> = repeat value for (count+1) times
-            // 00 = row terminator (move to next row, x = 0)
-            // Other = literal pixel
+            int totalPixels = width * height;
             std::vector<uint8_t> pixels(totalPixels, 0);
-            int x = 0, y = 0;
 
-            for (size_t pos = offset; pos < data.size() && y < height; ) {
+            // Decompress RLE (matching PowerShell reference):
+            // FF VV CC = repeat value VV for CC+1 times
+            // 00 = row end (move to next row)
+            // Other = literal pixel
+            int x = 0, y = 0;
+            size_t pos = offset;
+
+            while (pos < data.size() && y < height) {
                 uint8_t byte = data[pos++];
 
                 if (byte == 0xFF && pos + 1 < data.size()) {
+                    // RLE: repeat value for count+1 times
                     uint8_t value = data[pos++];
-                    uint8_t count = data[pos++];
-                    for (int k = 0; k <= count && x < width; ++k) {
-                        if (y * width + x < totalPixels) {
+                    uint8_t count = data[pos++] + 1;
+                    for (int k = 0; k < count && x < width; ++k) {
+                        if (y < height && y * width + x < totalPixels) {
                             pixels[y * width + x] = value;
                         }
                         x++;
                     }
                 } else if (byte == 0x00) {
-                    // Row terminator - move to next row
+                    // Row end - move to next row
                     y++;
                     x = 0;
                 } else {
                     // Literal pixel
-                    if (x < width && y * width + x < totalPixels) {
+                    if (x < width && y < height && y * width + x < totalPixels) {
                         pixels[y * width + x] = byte;
                     }
                     x++;
                 }
             }
 
-            // Vertical flip the pixel data
-            std::vector<uint8_t> flipped(totalPixels);
-            for (int y = 0; y < height; ++y) {
-                for (int x = 0; x < width; ++x) {
-                    flipped[(height - 1 - y) * width + x] = pixels[y * width + x];
-                }
-            }
-
-            // Write BMP
+            // Write BMP (no vertical flip - BMP already bottom-up)
             char filename[256];
             snprintf(filename, sizeof(filename), "%s/idx%05d_spr%03zu_%dx%d.bmp",
                      outDir.c_str(), res.id, frameIdx, width, height);
@@ -3254,11 +3252,12 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
             out.write(reinterpret_cast<char*>(bmpHeader), 54);
             out.write(reinterpret_cast<char*>(palette), 1024);
 
+            // Write pixel rows (BMP is bottom-up, so flip Y)
             std::vector<uint8_t> row(rowSize, 0);
-            for (int y = height - 1; y >= 0; --y) {
-                for (int x = 0; x < width; ++x) {
-                    size_t idx = y * width + x;
-                    row[x] = (idx < flipped.size()) ? flipped[idx] : 0;
+            for (int by = height - 1; by >= 0; --by) {
+                for (int bx = 0; bx < width; ++bx) {
+                    size_t idx = by * width + bx;
+                    row[bx] = (idx < pixels.size()) ? pixels[idx] : 0;
                 }
                 out.write(reinterpret_cast<char*>(row.data()), rowSize);
             }
