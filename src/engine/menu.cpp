@@ -92,6 +92,37 @@ void MenuBar::createMenus() {
     AppendMenuW(debugMenu_, MF_STRING, ID_DEBUG_PUZZLE_DEBUGGER, L"&Puzzle Debugger");
     AppendMenuW(debugMenu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(debugMenu_, MF_STRING, ID_DEBUG_SAVE_EDITOR, L"&Save Editor");
+    AppendMenuW(debugMenu_, MF_SEPARATOR, 0, nullptr);
+
+    // === Bot Submenu ===
+    botMenu_ = CreatePopupMenu();
+    AppendMenuW(botMenu_, MF_STRING, ID_DEBUG_BOT_ENABLE, L"&Enable Bot");
+    AppendMenuW(botMenu_, MF_STRING, ID_DEBUG_BOT_DISABLE, L"&Disable Bot");
+    AppendMenuW(botMenu_, MF_SEPARATOR, 0, nullptr);
+
+    // Bot Mode submenu
+    botModeMenu_ = CreatePopupMenu();
+    AppendMenuW(botModeMenu_, MF_STRING, ID_DEBUG_BOT_MODE_OBSERVE, L"&Observe (Watch Only)");
+    AppendMenuW(botModeMenu_, MF_STRING, ID_DEBUG_BOT_MODE_ASSIST, L"&Assist (Hints)");
+    AppendMenuW(botModeMenu_, MF_STRING, ID_DEBUG_BOT_MODE_AUTOPLAY, L"Auto-&Play");
+    AppendMenuW(botModeMenu_, MF_STRING, ID_DEBUG_BOT_MODE_SPEEDRUN, L"&Speed Run");
+    AppendMenuW(botMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(botModeMenu_), L"Bot &Mode");
+
+    // Bot Game Type submenu
+    botGameMenu_ = CreatePopupMenu();
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_GIZMOS, L"&Gizmos && Gadgets");
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_NEPTUNE, L"Operation &Neptune");
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_OUTNUMBERED, L"&OutNumbered!");
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_SPELLBOUND, L"&Spellbound!");
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_TREASURE_MT, L"Treasure &Mountain!");
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_TREASURE_MS, L"Treasure Math&Storm!");
+    AppendMenuW(botGameMenu_, MF_STRING, ID_DEBUG_BOT_GAME_TREASURE_COVE, L"Treasure &Cove!");
+    AppendMenuW(botMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(botGameMenu_), L"&Game Type");
+
+    AppendMenuW(botMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(botMenu_, MF_STRING, ID_DEBUG_BOT_SHOW_STATUS, L"Show Bot &Status...");
+
+    AppendMenuW(debugMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(botMenu_), L"&Bot");
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(debugMenu_), L"&Debug");
 
     // === About Menu ===

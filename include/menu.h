@@ -29,6 +29,22 @@ enum MenuID {
     ID_DEBUG_PUZZLE_DEBUGGER,
     ID_DEBUG_SAVE_EDITOR,
 
+    // Bot submenu (under Debug)
+    ID_DEBUG_BOT_ENABLE = 3100,
+    ID_DEBUG_BOT_DISABLE,
+    ID_DEBUG_BOT_MODE_OBSERVE,
+    ID_DEBUG_BOT_MODE_ASSIST,
+    ID_DEBUG_BOT_MODE_AUTOPLAY,
+    ID_DEBUG_BOT_MODE_SPEEDRUN,
+    ID_DEBUG_BOT_GAME_GIZMOS,
+    ID_DEBUG_BOT_GAME_NEPTUNE,
+    ID_DEBUG_BOT_GAME_OUTNUMBERED,
+    ID_DEBUG_BOT_GAME_SPELLBOUND,
+    ID_DEBUG_BOT_GAME_TREASURE_MT,
+    ID_DEBUG_BOT_GAME_TREASURE_MS,
+    ID_DEBUG_BOT_GAME_TREASURE_COVE,
+    ID_DEBUG_BOT_SHOW_STATUS,
+
     // About menu
     ID_ABOUT_INFO = 4001,
 };
@@ -67,6 +83,9 @@ private:
     HMENU fileMenu_ = nullptr;
     HMENU configMenu_ = nullptr;
     HMENU debugMenu_ = nullptr;
+    HMENU botMenu_ = nullptr;      // Bot submenu
+    HMENU botModeMenu_ = nullptr;  // Bot mode submenu
+    HMENU botGameMenu_ = nullptr;  // Bot game type submenu
     HMENU aboutMenu_ = nullptr;
 
     MenuCallback callback_;

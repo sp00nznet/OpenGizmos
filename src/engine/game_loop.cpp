@@ -4,6 +4,7 @@
 #include "input.h"
 #include "asset_cache.h"
 #include "font.h"
+#include "bot/bot_manager.h"
 #ifdef _WIN32
 #include "menu.h"
 #include "asset_viewer.h"
@@ -145,6 +146,9 @@ bool Game::initialize(const GameConfig& config) {
     // Load config
     loadConfig();
 
+    // Initialize bot manager
+    Bot::BotManager::getInstance().initialize(this);
+
     // Initialize timing
     startTime_ = Clock::now();
     lastFrameTime_ = startTime_;
@@ -187,6 +191,18 @@ void Game::processFrame() {
         // Update (unless paused)
         if (!paused_) {
             state->update(deltaTime_);
+
+            // Update bot system
+            auto& botMgr = Bot::BotManager::getInstance();
+            if (botMgr.isEnabled()) {
+                botMgr.update(deltaTime_);
+
+                // In AutoPlay or SpeedRun mode, execute bot decisions
+                if (botMgr.getMode() == Bot::BotMode::AutoPlay ||
+                    botMgr.getMode() == Bot::BotMode::SpeedRun) {
+                    botMgr.executeDecision(input_.get());
+                }
+            }
         }
 
         // Render
@@ -252,6 +268,9 @@ void Game::shutdown() {
         std::string bindingsPath = config_.configPath + "/keybindings.cfg";
         input_->saveBindings(bindingsPath);
     }
+
+    // Shutdown bot manager
+    Bot::BotManager::getInstance().shutdown();
 
     // Clear state stack
     while (!stateStack_.empty()) {
@@ -563,6 +582,72 @@ void Game::handleMenuCommand(int menuId) {
         case ID_DEBUG_SAVE_EDITOR:
             SDL_Log("Menu: Save Editor");
             // TODO: Open save editor
+            break;
+
+        // Bot submenu
+        case ID_DEBUG_BOT_ENABLE:
+            SDL_Log("Menu: Enable Bot");
+            Bot::BotManager::getInstance().setEnabled(true);
+            break;
+        case ID_DEBUG_BOT_DISABLE:
+            SDL_Log("Menu: Disable Bot");
+            Bot::BotManager::getInstance().setEnabled(false);
+            break;
+        case ID_DEBUG_BOT_MODE_OBSERVE:
+            SDL_Log("Menu: Bot Mode - Observe");
+            Bot::BotManager::getInstance().setMode(Bot::BotMode::Observe);
+            break;
+        case ID_DEBUG_BOT_MODE_ASSIST:
+            SDL_Log("Menu: Bot Mode - Assist");
+            Bot::BotManager::getInstance().setMode(Bot::BotMode::Assist);
+            break;
+        case ID_DEBUG_BOT_MODE_AUTOPLAY:
+            SDL_Log("Menu: Bot Mode - AutoPlay");
+            Bot::BotManager::getInstance().setMode(Bot::BotMode::AutoPlay);
+            break;
+        case ID_DEBUG_BOT_MODE_SPEEDRUN:
+            SDL_Log("Menu: Bot Mode - SpeedRun");
+            Bot::BotManager::getInstance().setMode(Bot::BotMode::SpeedRun);
+            break;
+        case ID_DEBUG_BOT_GAME_GIZMOS:
+            SDL_Log("Menu: Bot Game - Gizmos & Gadgets");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::GizmosAndGadgets);
+            break;
+        case ID_DEBUG_BOT_GAME_NEPTUNE:
+            SDL_Log("Menu: Bot Game - Operation Neptune");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::OperationNeptune);
+            break;
+        case ID_DEBUG_BOT_GAME_OUTNUMBERED:
+            SDL_Log("Menu: Bot Game - OutNumbered!");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::OutNumbered);
+            break;
+        case ID_DEBUG_BOT_GAME_SPELLBOUND:
+            SDL_Log("Menu: Bot Game - Spellbound!");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::Spellbound);
+            break;
+        case ID_DEBUG_BOT_GAME_TREASURE_MT:
+            SDL_Log("Menu: Bot Game - Treasure Mountain!");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::TreasureMountain);
+            break;
+        case ID_DEBUG_BOT_GAME_TREASURE_MS:
+            SDL_Log("Menu: Bot Game - Treasure MathStorm!");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::TreasureMathStorm);
+            break;
+        case ID_DEBUG_BOT_GAME_TREASURE_COVE:
+            SDL_Log("Menu: Bot Game - Treasure Cove!");
+            Bot::BotManager::getInstance().setGameType(Bot::GameType::TreasureCove);
+            break;
+        case ID_DEBUG_BOT_SHOW_STATUS:
+            {
+                SDL_Log("Menu: Show Bot Status");
+                auto& botMgr = Bot::BotManager::getInstance();
+                std::string status = botMgr.getStatusText();
+                float progress = botMgr.getCompletionProgress();
+                std::string message = "Bot Status:\n\n" + status +
+                                      "\n\nCompletion: " + std::to_string(int(progress * 100)) + "%";
+                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Bot Status",
+                    message.c_str(), renderer_ ? renderer_->getSDLWindow() : nullptr);
+            }
             break;
 
         // About menu

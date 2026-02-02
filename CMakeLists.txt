@@ -51,11 +51,19 @@ set(GAME_SOURCES
     src/game/player.cpp
 )
 
+set(BOT_SOURCES
+    src/bot/bot_manager.cpp
+    src/bot/neptune_bot.cpp
+    src/bot/gizmos_bot.cpp
+    src/bot/educational_bot.cpp
+)
+
 set(ALL_SOURCES
     src/main.cpp
     ${LOADER_SOURCES}
     ${ENGINE_SOURCES}
     ${GAME_SOURCES}
+    ${BOT_SOURCES}
 )
 
 # Main executable
