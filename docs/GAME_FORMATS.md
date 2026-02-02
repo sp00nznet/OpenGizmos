@@ -248,6 +248,40 @@ NN           - Literal pixel (if NN != 0xFF and NN != 0x00)
 | 63988 | tilemap | 640x480 | Labyrinth 2 background |
 | 63998 | tilemap | 640x480 | Labyrinth 2 variation |
 
+### READER Puzzle Format (Operation Neptune)
+
+**READER1.RSC and READER2.RSC Resources:**
+
+Reading comprehension puzzle assets stored as small overlay tilemaps.
+
+| Resource | Type | Size | Content |
+|----------|------|------|---------|
+| 63868 | tilemap | 640x480 overlay | Reader puzzle background 1 |
+| 63869 | sprite data | 229 bytes | Text/UI sprites |
+| 63878 | tilemap | 640x480 overlay | Reader puzzle background 2 |
+| 63888 | tilemap | 640x480 overlay | Reader puzzle background 3 |
+| 63889 | sprite data | 400 bytes | Question sprites |
+| 63898 | tilemap | 640x480 overlay | Reader puzzle background 4 |
+| 63908 | tilemap | 640x480 overlay | Reader puzzle background 5 |
+| 63918 | tilemap | 640x480 overlay | Reader puzzle background 6 |
+| 63928 | tilemap | 640x480 overlay | Reader puzzle background 7 |
+| 63929 | sprite data | 1038 bytes | Answer option sprites |
+| 63938 | tilemap | 640x480 overlay | Reader puzzle background 8 |
+
+**Format:** Same RLE compression as LABRNTH resources. Smaller file sizes indicate
+these are overlay images with mostly transparent pixels.
+
+### Extraction Status Summary
+
+| Game | Resource | Sprites | Status |
+|------|----------|---------|--------|
+| Operation Neptune | SORTER.RSC | 495 | ✓ Extracted |
+| Operation Neptune | LABRNTH*.RSC tilemaps | 4 | ✓ Decoded (640x480) |
+| Operation Neptune | LABRNTH*.RSC sprites | 82 | ✓ Extracted |
+| Operation Neptune | READER*.RSC tilemaps | 8 | ✓ Decoded (640x480) |
+| Gizmos & Gadgets | GIZMO256.DAT | varies | Partial |
+| Gizmos & Gadgets | PUZZLE.DAT | varies | Partial |
+
 ## Puzzle Types (SSG)
 
 Resource IDs indicate puzzle category:
