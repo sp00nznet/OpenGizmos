@@ -3121,6 +3121,12 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
     uint8_t palette[256][4] = {};
     loadPalette(palettePath, palette);
 
+    // Set palette index 0 to magenta (transparency indicator)
+    palette[0][0] = 255;  // Blue
+    palette[0][1] = 0;    // Green
+    palette[0][2] = 255;  // Red
+    palette[0][3] = 0;    // Reserved
+
     NEResourceExtractor ne;
     if (!ne.open(datPath)) {
         std::cerr << "Failed to open NE: " << ne.getLastError() << "\n";
