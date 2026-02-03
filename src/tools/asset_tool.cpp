@@ -3374,25 +3374,29 @@ void extractRundSprites(const std::string& datPath, const std::string& palettePa
         std::vector<uint8_t> pixels(totalPixels, 0);
 
         // Decompress RLE starting at byte 8
-        // Format: FF VV CC = repeat value VV for CC+1 times
-        //         Other = literal pixel (no row terminators in this format)
+        // Format discovered from analysis:
+        //   Byte >= 0x80: RLE run, count = (byte & 0x7F), next byte is value to repeat
+        //   Byte < 0x80: Literal run, count = byte, followed by 'count' literal bytes
         int pixelIdx = 0;
         size_t pos = 8;
 
         while (pos < data.size() && pixelIdx < totalPixels) {
             uint8_t byte = data[pos++];
 
-            if (byte == 0xFF && pos + 1 < data.size()) {
-                // RLE: repeat value for count+1 times
+            if (byte >= 0x80) {
+                // RLE: repeat next byte (byte & 0x7F) times
+                int count = byte & 0x7F;
+                if (pos >= data.size()) break;
                 uint8_t value = data[pos++];
-                uint8_t count = data[pos++];
-                int repeat = count + 1;
-                for (int k = 0; k < repeat && pixelIdx < totalPixels; ++k) {
+                for (int k = 0; k < count && pixelIdx < totalPixels; ++k) {
                     pixels[pixelIdx++] = value;
                 }
             } else {
-                // Literal pixel
-                pixels[pixelIdx++] = byte;
+                // Literal: read 'byte' literal bytes
+                int count = byte;
+                for (int k = 0; k < count && pos < data.size() && pixelIdx < totalPixels; ++k) {
+                    pixels[pixelIdx++] = data[pos++];
+                }
             }
         }
 
@@ -3439,6 +3443,56 @@ void extractRundSprites(const std::string& datPath, const std::string& palettePa
     }
 
     std::cout << "Extracted " << totalExtracted << " RUND sprites to " << outDir << "\n";
+}
+
+// Dump raw RUND resource bytes for analysis
+void dumpRundBytes(const std::string& datPath, int count) {
+    NEResourceExtractor ne;
+    if (!ne.open(datPath)) {
+        std::cerr << "Failed to open NE: " << ne.getLastError() << "\n";
+        return;
+    }
+
+    auto resources = ne.listResources();
+    int dumped = 0;
+
+    for (const auto& res : resources) {
+        if (dumped >= count) break;
+        if (res.typeId != 0xFF01 || res.size < 8) continue;  // CUSTOM_32513
+
+        auto data = ne.extractResource(res);
+        if (data.size() < 8) continue;
+
+        // Check for RUND magic at bytes 4-7
+        if (data[4] != 'R' || data[5] != 'U' || data[6] != 'N' || data[7] != 'D') continue;
+
+        // Parse dimensions
+        uint16_t width = data[0] | (data[1] << 8);
+        uint16_t height = data[2] | (data[3] << 8);
+
+        std::cout << "\n=== Resource ID " << res.id << " (" << width << "x" << height
+                  << "), size=" << data.size() << " bytes ===\n";
+
+        // Dump first 128 bytes as hex
+        size_t dumpLen = std::min(data.size(), (size_t)128);
+        for (size_t i = 0; i < dumpLen; i++) {
+            if (i % 16 == 0) {
+                if (i > 0) std::cout << "\n";
+                printf("%04zx: ", i);
+            }
+            printf("%02X ", data[i]);
+        }
+        std::cout << "\n";
+
+        // Show expected total pixels vs compressed data size
+        int totalPixels = width * height;
+        int compressedSize = data.size() - 8;
+        float ratio = (float)compressedSize / totalPixels;
+        std::cout << "Total pixels: " << totalPixels << ", Compressed bytes: " << compressedSize
+                  << ", Ratio: " << ratio << "\n";
+
+        dumped++;
+    }
 }
 
 // Extract Operation Neptune labyrinth tilemaps (640x480 RLE-compressed)
@@ -5291,6 +5345,9 @@ int main(int argc, char* argv[]) {
         extractIndexedSprites(argv[2], argv[3], argv[4]);
     } else if (command == "extract-rund" && argc >= 5) {
         extractRundSprites(argv[2], argv[3], argv[4]);
+    } else if (command == "dump-rund" && argc >= 3) {
+        int count = (argc >= 4) ? std::stoi(argv[3]) : 5;
+        dumpRundBytes(argv[2], count);
     } else if (command == "extract-labyrinth" && argc >= 4) {
         extractLabyrinthTilemaps(argv[2], argv[3]);
     } else if (command == "extract-labyrinth-sprites" && argc >= 5) {

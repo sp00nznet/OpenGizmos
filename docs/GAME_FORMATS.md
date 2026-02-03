@@ -96,6 +96,7 @@ DATA/
 ### Operation Neptune (ONWINCD)
 ```
 ONWINCD/
+├── NEP256.DLL     - 256-color sprites (NE, 1158 RUND sprites)
 ├── SORTER.RSC     - Sorting puzzle sprites/data (NE, CUSTOM_32513/32514/32515)
 ├── COMMON.RSC     - Common assets + WAV audio (NE, custom types)
 ├── LABRNTH1.RSC   - Labyrinth level 1 maps (NE, custom types)
@@ -106,6 +107,8 @@ ONWINCD/
 ├── AUTORUN.RSC    - Autorun/startup (NE)
 ├── WS*.GRP        - GRP archives containing WAV audio wrappers
 └── WSCOMMON.GRP   - Common audio (GRP wrapper around single WAV)
+INSTALL/
+└── AUTO256.BMP    - 256-color palette source (602x400 8-bit BMP)
 ```
 
 **Key Observations for Operation Neptune:**
@@ -271,10 +274,54 @@ Reading comprehension puzzle assets stored as small overlay tilemaps.
 **Format:** Same RLE compression as LABRNTH resources. Smaller file sizes indicate
 these are overlay images with mostly transparent pixels.
 
+### Operation Neptune 256-Color Sprite DLLs (NEP256.DLL)
+
+The main 256-color sprites for Operation Neptune are stored in NEP256.DLL as RUND-format
+resources (CUSTOM_32513 / 0xFF01). The palette is stored in AUTO256.BMP in the INSTALL folder.
+
+**RUND Resource Structure:**
+```
+Offset  Size  Description
+0x00    2     Width (little-endian)
+0x02    2     Height (little-endian)
+0x04    4     Magic "RUND" (0x52 0x55 0x4E 0x44)
+0x08    var   RLE-compressed pixel data
+```
+
+**RUND RLE Compression Format:**
+```
+Byte >= 0x80:  RLE run - count = (byte & 0x7F), next byte is value to repeat
+Byte < 0x80:   Literal run - count = byte, followed by 'count' literal bytes
+```
+
+Example decoding (8x4 sprite, 32 pixels):
+```
+03 C8 27 27      -> 3 literals: C8, 27, 27 (3 pixels)
+85 C8            -> RLE: repeat C8 five times (5 pixels)
+84 27            -> RLE: repeat 27 four times (4 pixels)
+84 C8            -> RLE: repeat C8 four times (4 pixels)
+84 27            -> RLE: repeat 27 four times (4 pixels)
+85 C8            -> RLE: repeat C8 five times (5 pixels)
+07 27 27 C8...   -> 7 literals (7 pixels)
+Total: 3+5+4+4+4+5+7 = 32 pixels ✓
+```
+
+**NEP256.DLL Statistics:**
+- Total sprites: 1158
+- Resource type: CUSTOM_32513 (0xFF01)
+- Dimensions range: 8x4 to 616x304 pixels
+- Compression ratio: typically 0.15-0.50
+
+**Palette Source:**
+- File: INSTALL/AUTO256.BMP (602x400 8-bit BMP)
+- Palette at BMP offset 0x36 (54 bytes), 256 colors × 4 bytes BGRA
+- Index 0 typically used for transparency (set to magenta 255,0,255)
+
 ### Extraction Status Summary
 
 | Game | Resource | Sprites | Status |
 |------|----------|---------|--------|
+| Operation Neptune | NEP256.DLL | 1158 | ✓ Extracted (RUND format) |
 | Operation Neptune | SORTER.RSC | 495 | ✓ Extracted |
 | Operation Neptune | LABRNTH*.RSC tilemaps | 4 | ✓ Decoded (640x480) |
 | Operation Neptune | LABRNTH*.RSC sprites | 82 | ✓ Extracted |
