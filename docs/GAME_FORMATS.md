@@ -56,11 +56,33 @@ SSOWINCD/
 ├── SSO2.DAT       - Additional graphics (NE)
 ├── SSO3.DAT       - Additional graphics (NE)
 ├── SND.DAT        - Sound effects (NE, WAV in CUSTOM_32514)
-├── SPEECH.DAT     - Speech audio (NE)
-├── SSOWINCD.DAT   - Game save/config
-├── SSO.FON        - Game font
+├── SPEECH.DAT     - Speech audio (NE, WAV in CUSTOM_32513)
+├── SSOWINCD.DAT   - Game save/config (USR format)
+├── SSO.FON        - Game font (NE)
 └── MIDI/          - Standard MIDI files
 ```
+
+**OutNumbered Sprite Format Analysis (NEEDS WORK):**
+
+The sprite format in SSO differs from other Super Solvers games:
+- CUSTOM_15 resources contain ASEQ (animation sequence) data, NOT palettes
+- CUSTOM_32514 in SND.DAT contains WAV audio
+- CUSTOM_32514 in SSO2.DAT contains game text/puzzle data, NOT sprite metadata
+- Sprite resources (CUSTOM_32513) use a different header/compression format
+
+**Known issues:**
+- Palette location unknown - not in standard resources
+- RLE format differs from other TLC games (FF VV CC format doesn't work)
+- Dimension estimation produces incorrect results (very tall sprites)
+
+**Audio extraction works:**
+- SND.DAT CUSTOM_32514: 60 WAV sound effects
+- SPEECH.DAT CUSTOM_32513: 68 WAV speech files
+
+**TODO:** Reverse engineer the actual sprite format by:
+1. Analyzing game executable for palette loading code
+2. Comparing sprite data structure to working games
+3. Testing different RLE interpretations
 
 ### Super Solvers: Spellbound (SSR)
 ```
