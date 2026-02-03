@@ -6,15 +6,15 @@ An open-source reimplementation of **The Learning Company's Super Solvers series
 
 ## Supported Games
 
-| Game | Status | Year |
-|------|--------|------|
-| Super Solvers: Gizmos & Gadgets | Primary Focus | 1993 |
-| Super Solvers: Operation Neptune | In Progress | 1991 |
-| Super Solvers: OutNumbered! | Planned | 1990 |
-| Super Solvers: Spellbound! | Planned | 1991 |
-| Super Solvers: Treasure Mountain! | Planned | 1990 |
-| Treasure MathStorm! | Planned | 1992 |
-| Treasure Cove! | Research | 1992 |
+| Game | Sprites | Audio | Status |
+|------|---------|-------|--------|
+| Super Solvers: Gizmos & Gadgets | ✓ | ✓ | Primary Focus |
+| Super Solvers: Operation Neptune | ✓ 1158 | ✓ | In Progress |
+| Super Solvers: Treasure Mountain! | ✓ 760 | ✓ | Asset Extraction Working |
+| Super Solvers: OutNumbered! | ✗ | ✓ 128 | Needs Format RE |
+| Super Solvers: Spellbound! | Partial | - | Research |
+| Treasure MathStorm! | ✓ | - | Asset Extraction Working |
+| Treasure Cove! | ✓ | - | Asset Extraction Working |
 
 ## Vision
 
@@ -146,13 +146,25 @@ This is an early work-in-progress.
 ### Operation Neptune
 - [x] RSC file format decoder
 - [x] Palette extraction (doubled-byte format)
-- [x] Sprite extraction from SORTER.RSC
-- [ ] Labyrinth map decoder
+- [x] Sprite extraction from SORTER.RSC (495 sprites)
+- [x] NEP256.DLL RUND sprites (1158 sprites)
+- [x] Labyrinth/Reader tilemap decoder (640x480)
 - [ ] Puzzle implementations
 - [ ] Submarine navigation
 
+### Treasure Mountain! (TMT)
+- [x] TMT256.DLL RUND format sprites (760 sprites)
+- [x] Audio extraction from TM*SOUND.DLL
+- [ ] Game logic implementation
+
+### OutNumbered! (SSO)
+- [x] Audio extraction (60 SFX + 68 speech)
+- [ ] Sprite format differs from other games - needs reverse engineering
+- [ ] Palette location unknown
+
 ### Other Games
-- [x] Format analysis for SSO, SSR, TMS
+- [x] Treasure MathStorm (TMS) - RUND sprites work
+- [x] Treasure Cove - RUND sprites work
 - [ ] Game-specific implementations
 
 ## Legal
