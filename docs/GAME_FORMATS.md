@@ -115,6 +115,46 @@ DATA/
 └── *.SMK          - Smacker video files
 ```
 
+### Treasure Mountain! (TMT / TMTWINCD)
+```
+TMTWINCD/
+├── TMT.DLL        - Main game logic + metadata (NE, 558 resources)
+├── TMT256.DLL     - 256-color sprites (NE, 765 resources, RUND format)
+├── TMT16.DLL      - 16-color sprites (NE)
+├── TMTWINCD.EXE   - Main executable (NE, 17 resources)
+├── TM0SOUND.DLL   - Sound bank 0 (NE, WAV audio)
+├── TM1SOUND.DLL   - Sound bank 1 (NE, WAV audio)
+├── TM2SOUND.DLL   - Sound bank 2 (NE, WAV audio)
+├── TM3SOUND.DLL   - Sound bank 3 (NE, WAV audio)
+├── TM4SOUND.DLL   - Sound bank 4 (NE, WAV audio)
+├── TM5SOUND.DLL   - Sound bank 5 (NE, WAV audio)
+├── TM6SOUND.DLL   - Sound bank 6 (NE, WAV audio)
+├── TM7SOUND.DLL   - Sound bank 7 (NE, WAV audio)
+└── TM8SOUND.DLL   - Sound bank 8 (NE, WAV audio)
+```
+
+**TMT256.DLL Resource Types:**
+| Type | ID | Count | Content |
+|------|----|-------|---------|
+| CUSTOM_15 | 0x800F | 1 | Animation data (PMAP markers) |
+| CUSTOM_32513 | 0xFF01 | 764 | RUND format sprites |
+
+**Sprite Extraction:**
+- Uses same RUND format as Operation Neptune
+- 760 sprites successfully extracted with correct dimensions
+- Dimensions range from 12×12 to 512×364 pixels
+
+**Palette Status: NOT FOUND**
+- Palette is NOT stored in standard resource locations
+- CUSTOM_15 contains PMAP animation references, not palette
+- TMT.DLL CUSTOM_32514 contains game metadata, not palette
+- Palette likely set at runtime via VGA DAC programming
+- See [PALETTE_RESEARCH.md](PALETTE_RESEARCH.md) for capture instructions
+
+**Audio:**
+- TM*SOUND.DLL files contain WAV audio in CUSTOM_32513 resources
+- Multiple sound banks for different game areas
+
 ### Operation Neptune (ONWINCD)
 ```
 ONWINCD/
