@@ -3141,14 +3141,14 @@ std::pair<int,int> estimateDimensions(const std::vector<uint8_t>& data, uint32_t
 }
 
 void extractIndexedSprites(const std::string& datPath, const std::string& palettePath, const std::string& outDir) {
-    uint8_t palette[256][4] = {};
-    loadPalette(palettePath, palette);
+    uint8_t defaultPalette[256][4] = {};
+    loadPalette(palettePath, defaultPalette);
 
     // Set palette index 0 to magenta (transparency indicator)
-    palette[0][0] = 255;  // Blue
-    palette[0][1] = 0;    // Green
-    palette[0][2] = 255;  // Red
-    palette[0][3] = 0;    // Reserved
+    defaultPalette[0][0] = 255;  // Blue
+    defaultPalette[0][1] = 0;    // Green
+    defaultPalette[0][2] = 255;  // Red
+    defaultPalette[0][3] = 0;    // Reserved
 
     NEResourceExtractor ne;
     if (!ne.open(datPath)) {
@@ -3160,6 +3160,30 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
 
     auto resources = ne.listResources();
     int totalExtracted = 0;
+
+    // Build map of per-resource palettes (CUSTOM_32514, 1536 bytes, doubled-byte format)
+    std::map<int, std::vector<uint8_t>> perResourcePalettes;
+    for (const auto& res : resources) {
+        if (res.typeId == 0xFF02 && res.size == 1536) {  // CUSTOM_32514 palette
+            auto palData = ne.extractResource(res);
+            if (palData.size() == 1536) {
+                std::vector<uint8_t> pal(1024, 0);
+                // Convert doubled-byte format: 00 R 00 G 00 B -> BGRA
+                for (int i = 0; i < 256 && i * 6 + 5 < (int)palData.size(); ++i) {
+                    pal[i * 4 + 2] = palData[i * 6 + 1];  // R
+                    pal[i * 4 + 1] = palData[i * 6 + 3];  // G
+                    pal[i * 4 + 0] = palData[i * 6 + 5];  // B
+                    pal[i * 4 + 3] = 0;
+                }
+                // Set index 0 to magenta for transparency
+                pal[0] = 255; pal[1] = 0; pal[2] = 255; pal[3] = 0;
+                perResourcePalettes[res.id] = pal;
+            }
+        }
+    }
+    if (!perResourcePalettes.empty()) {
+        std::cout << "Found " << perResourcePalettes.size() << " per-resource palettes\n";
+    }
 
     // Known dimensions for specific resources (from successful manual extractions)
     std::map<int, std::pair<int,int>> knownDims = {
@@ -3174,6 +3198,15 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
 
     for (const auto& res : resources) {
         if (res.typeId != 0xFF01 || res.size < 18) continue;  // CUSTOM_32513
+
+        // Use per-resource palette if available, otherwise default
+        uint8_t palette[256][4];
+        if (perResourcePalettes.count(res.id)) {
+            auto& pal = perResourcePalettes[res.id];
+            memcpy(palette, pal.data(), 1024);
+        } else {
+            memcpy(palette, defaultPalette, 1024);
+        }
 
         auto data = ne.extractResource(res);
         if (data.size() < 18) continue;
