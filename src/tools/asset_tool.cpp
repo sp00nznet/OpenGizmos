@@ -3333,9 +3333,58 @@ void extractIndexedSprites(const std::string& datPath, const std::string& palett
 
 // Extract sprites in RUND format (Treasure Cove, Treasure Mountain)
 // Format: width(2) + height(2) + "RUND" + RLE data
+// Load palette from CUSTOM_32514 resource (1536 bytes, doubled-byte format: RR GG BB)
+bool loadPaletteFromResource(const std::string& rscPath, uint16_t resId, uint8_t palette[256][4]) {
+    NEResourceExtractor ne;
+    if (!ne.open(rscPath)) {
+        std::cerr << "Failed to open RSC for palette: " << ne.getLastError() << "\n";
+        return false;
+    }
+
+    auto resources = ne.listResources();
+    for (const auto& res : resources) {
+        if (res.typeId == 0xFF02 && res.id == resId && res.size == 1536) {  // CUSTOM_32514
+            auto data = ne.extractResource(res);
+            if (data.size() == 1536) {
+                // Format: RR GG BB (each byte doubled, so 6 bytes per color)
+                for (int i = 0; i < 256; ++i) {
+                    uint8_t r = data[i * 6];      // Red (skip duplicate at i*6+1)
+                    uint8_t g = data[i * 6 + 2];  // Green (skip duplicate at i*6+3)
+                    uint8_t b = data[i * 6 + 4];  // Blue (skip duplicate at i*6+5)
+                    palette[i][0] = b;  // BMP format is BGRA
+                    palette[i][1] = g;
+                    palette[i][2] = r;
+                    palette[i][3] = 0;
+                }
+                std::cout << "Loaded palette from resource ID " << resId << " in " << rscPath << "\n";
+                return true;
+            }
+        }
+    }
+    std::cerr << "Could not find palette resource ID " << resId << " in " << rscPath << "\n";
+    return false;
+}
+
 void extractRundSprites(const std::string& datPath, const std::string& palettePath, const std::string& outDir) {
     uint8_t palette[256][4] = {};
-    loadPalette(palettePath, palette);
+
+    // Check if palettePath contains a colon (RSC:ID format) for resource-based palette
+    // Use rfind to skip drive letter colon on Windows (e.g., C:/path/file.RSC:34768)
+    size_t colonPos = palettePath.rfind(':');
+    // Make sure it's not just the drive letter colon (position 1 on Windows)
+    if (colonPos != std::string::npos && colonPos > 2) {
+        std::string rscPath = palettePath.substr(0, colonPos);
+        uint16_t resId = std::stoi(palettePath.substr(colonPos + 1));
+        if (!loadPaletteFromResource(rscPath, resId, palette)) {
+            std::cerr << "Falling back to grayscale palette\n";
+            for (int i = 0; i < 256; ++i) {
+                palette[i][0] = palette[i][1] = palette[i][2] = i;
+                palette[i][3] = 0;
+            }
+        }
+    } else {
+        loadPalette(palettePath, palette);
+    }
 
     // Set palette index 0 to magenta (transparency indicator)
     palette[0][0] = 255;  // Blue
@@ -3430,6 +3479,159 @@ void extractRundSprites(const std::string& datPath, const std::string& palettePa
         }
 
         // Write pixel rows (BMP is bottom-up, so flip Y)
+        std::vector<uint8_t> row(rowSize, 0);
+        for (int by = height - 1; by >= 0; --by) {
+            for (int bx = 0; bx < width; ++bx) {
+                size_t idx = by * width + bx;
+                row[bx] = (idx < pixels.size()) ? pixels[idx] : 0;
+            }
+            out.write(reinterpret_cast<char*>(row.data()), rowSize);
+        }
+
+        totalExtracted++;
+    }
+
+    std::cout << "Extracted " << totalExtracted << " RUND sprites to " << outDir << "\n";
+}
+
+// Extract RUND sprites with multiple palettes based on ID ranges
+void extractRundSpritesMultiPalette(const std::string& datPath, const std::string& outDir, int numPalettes, char** paletteArgs) {
+    // Parse palette specifications: either "path.bmp" or "minId:path.rsc:resId"
+    struct PaletteSpec {
+        int minId;
+        uint8_t palette[256][4];
+    };
+    std::vector<PaletteSpec> palettes;
+
+    for (int p = 0; p < numPalettes; ++p) {
+        std::string spec = paletteArgs[p];
+        PaletteSpec ps;
+        ps.minId = 0;
+
+        // Check if it has a minId prefix (e.g., "34000:path")
+        size_t firstColon = spec.find(':');
+        if (firstColon != std::string::npos && firstColon < 6 && isdigit(spec[0])) {
+            ps.minId = std::stoi(spec.substr(0, firstColon));
+            spec = spec.substr(firstColon + 1);
+        }
+
+        // Now spec is either "path.bmp" or "path.rsc:resId"
+        size_t colonPos = spec.rfind(':');
+        if (colonPos != std::string::npos && colonPos > 2) {
+            std::string rscPath = spec.substr(0, colonPos);
+            uint16_t resId = std::stoi(spec.substr(colonPos + 1));
+            if (!loadPaletteFromResource(rscPath, resId, ps.palette)) {
+                std::cerr << "Failed to load palette from " << spec << "\n";
+                continue;
+            }
+        } else {
+            loadPalette(spec, ps.palette);
+        }
+
+        // Set index 0 to magenta
+        ps.palette[0][0] = 255;
+        ps.palette[0][1] = 0;
+        ps.palette[0][2] = 255;
+        ps.palette[0][3] = 0;
+
+        palettes.push_back(ps);
+        std::cout << "Palette for IDs >= " << ps.minId << ": " << paletteArgs[p] << "\n";
+    }
+
+    if (palettes.empty()) {
+        std::cerr << "No valid palettes loaded\n";
+        return;
+    }
+
+    // Sort by minId descending so we match highest threshold first
+    std::sort(palettes.begin(), palettes.end(), [](const PaletteSpec& a, const PaletteSpec& b) {
+        return a.minId > b.minId;
+    });
+
+    NEResourceExtractor ne;
+    if (!ne.open(datPath)) {
+        std::cerr << "Failed to open NE: " << ne.getLastError() << "\n";
+        return;
+    }
+
+    fs::create_directories(outDir);
+
+    auto resources = ne.listResources();
+    int totalExtracted = 0;
+
+    for (const auto& res : resources) {
+        if (res.typeId != 0xFF01 || res.size < 8) continue;
+
+        auto data = ne.extractResource(res);
+        if (data.size() < 8) continue;
+
+        if (data[4] != 'R' || data[5] != 'U' || data[6] != 'N' || data[7] != 'D') continue;
+
+        uint16_t width = data[0] | (data[1] << 8);
+        uint16_t height = data[2] | (data[3] << 8);
+
+        if (width == 0 || width > 1024 || height == 0 || height > 1024) continue;
+
+        // Find the right palette for this resource ID
+        uint8_t (*palette)[4] = palettes.back().palette;  // Default to lowest threshold
+        for (const auto& ps : palettes) {
+            if (res.id >= ps.minId) {
+                palette = const_cast<uint8_t(*)[4]>(ps.palette);
+                break;
+            }
+        }
+
+        int totalPixels = width * height;
+        std::vector<uint8_t> pixels(totalPixels, 0);
+
+        int pixelIdx = 0;
+        size_t pos = 8;
+
+        while (pos < data.size() && pixelIdx < totalPixels) {
+            uint8_t byte = data[pos++];
+
+            if (byte >= 0x80) {
+                int count = byte & 0x7F;
+                if (pos >= data.size()) break;
+                uint8_t value = data[pos++];
+                for (int k = 0; k < count && pixelIdx < totalPixels; ++k) {
+                    pixels[pixelIdx++] = value;
+                }
+            } else {
+                int count = byte;
+                for (int k = 0; k < count && pos < data.size() && pixelIdx < totalPixels; ++k) {
+                    pixels[pixelIdx++] = data[pos++];
+                }
+            }
+        }
+
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%s/rund_%05d_%dx%d.bmp",
+                 outDir.c_str(), res.id, width, height);
+
+        std::ofstream out(filename, std::ios::binary);
+        if (!out) continue;
+
+        int rowSize = (width + 3) & ~3;
+        int imageSize = rowSize * height;
+        int bmpSize = 54 + 1024 + imageSize;
+
+        uint8_t bmpHeader[54] = {'B', 'M'};
+        *(uint32_t*)&bmpHeader[2] = bmpSize;
+        *(uint32_t*)&bmpHeader[10] = 54 + 1024;
+        *(uint32_t*)&bmpHeader[14] = 40;
+        *(int32_t*)&bmpHeader[18] = width;
+        *(int32_t*)&bmpHeader[22] = height;
+        *(uint16_t*)&bmpHeader[26] = 1;
+        *(uint16_t*)&bmpHeader[28] = 8;
+        *(uint32_t*)&bmpHeader[34] = imageSize;
+
+        out.write(reinterpret_cast<char*>(bmpHeader), 54);
+
+        for (int i = 0; i < 256; ++i) {
+            out.write(reinterpret_cast<char*>(palette[i]), 4);
+        }
+
         std::vector<uint8_t> row(rowSize, 0);
         for (int by = height - 1; by >= 0; --by) {
             for (int bx = 0; bx < width; ++bx) {
@@ -5345,6 +5547,11 @@ int main(int argc, char* argv[]) {
         extractIndexedSprites(argv[2], argv[3], argv[4]);
     } else if (command == "extract-rund" && argc >= 5) {
         extractRundSprites(argv[2], argv[3], argv[4]);
+    } else if (command == "extract-rund-multi" && argc >= 6) {
+        // Extract RUND sprites with multiple palettes based on ID range
+        // Usage: extract-rund-multi <dll> <outdir> <palette1> [<minId>:<palette2>] ...
+        // Example: extract-rund-multi nep256.dll out auto256.bmp 34000:sorter.rsc:34768
+        extractRundSpritesMultiPalette(argv[2], argv[3], argc - 4, argv + 4);
     } else if (command == "dump-rund" && argc >= 3) {
         int count = (argc >= 4) ? std::stoi(argv[3]) : 5;
         dumpRundBytes(argv[2], count);
