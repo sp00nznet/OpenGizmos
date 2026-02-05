@@ -154,24 +154,48 @@ SSO appears to use a different scheme that hasn't been decoded yet.
 
 ---
 
-## Gizmos & Gadgets (SSG) - PARTIAL
+## Gizmos & Gadgets (SSG) - SOLVED
 
-**Status:** Basic extraction works, needs refinement
+**Status:** Palette extraction working
 
-**Palette Location:** Embedded in sprite resources or loaded at runtime
+**Palette Location:** CUSTOM_32515 resources in *256.DAT files
 
-**Known Working:**
-- NE resource extraction
-- Basic RLE decompression
-- Room/entity framework
+**Format:** Doubled-byte palette (1536 bytes = 256 × 6)
+- Same format as Operation Neptune
+- Each color stored as `RR GG BB` (2 bytes per component)
+- Extract by taking every other byte
+
+**Extraction Results:**
+- 1,893 sprites from 5 DAT files (GIZMO256, AUTO256, PLANE256, PUZ256, AE256)
+- Correct colors using extracted palette
 
 ---
 
-## Treasure MathStorm / Treasure Cove - WORKING
+## Treasure Cove! (TCV) - PALETTE NEEDED
 
-**Status:** RUND extraction works (same format as Neptune)
+**Status:** Sprite extraction works, palette not found
 
-These games share the RUND sprite format with Operation Neptune. Palette may be in a BMP file or need runtime capture like TMT.
+**Sprite Extraction:**
+- TCV256.DLL contains 1,508 RUND format sprites
+- Same format as Operation Neptune
+
+**Palette Status:**
+- Palette likely set at runtime
+- Need to capture via DOSBox or Windows debugger
+
+---
+
+## Treasure MathStorm! (TMS) - PALETTE NEEDED
+
+**Status:** Sprite extraction works, palette not found
+
+**Sprite Extraction:**
+- TMSDATA.DAT contains 1,644 sprites
+- Extracted via indexed method
+
+**Palette Status:**
+- Palette likely set at runtime
+- Need to capture via DOSBox or Windows debugger
 
 ---
 
@@ -225,6 +249,8 @@ If you capture a palette from one of the unsolved games:
 4. Submit via pull request or issue
 
 Palette files should be named: `{game}_palette.bin`
-- `tmt_palette.bin` - Treasure Mountain
-- `sso_palette.bin` - OutNumbered
-- `ssg_palette.bin` - Gizmos & Gadgets
+- `tmt_palette.bin` - Treasure Mountain!
+- `tcv_palette.bin` - Treasure Cove!
+- `tms_palette.bin` - Treasure MathStorm!
+- `sso_palette.bin` - OutNumbered!
+- ~~`ssg_palette.bin` - Gizmos & Gadgets~~ (SOLVED - in CUSTOM_32515)

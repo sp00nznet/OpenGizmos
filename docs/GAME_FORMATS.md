@@ -155,6 +155,35 @@ TMTWINCD/
 - TM*SOUND.DLL files contain WAV audio in CUSTOM_32513 resources
 - Multiple sound banks for different game areas
 
+### Treasure Cove! (TCV / TCVWINCD)
+```
+TCVWINCD/
+├── TCV.DLL        - Main game logic + metadata (NE)
+├── TCV256.DLL     - 256-color sprites (NE, 1514 resources, RUND format)
+├── TCV16.DLL      - 16-color sprites (NE)
+├── TCVSOUND.DLL   - Main sound bank (NE, WAV audio)
+├── TC2SOUND.DLL   - Sound bank 2 (NE, WAV audio)
+├── TC3SOUND.DLL   - Sound bank 3 (NE, WAV audio)
+├── TC4SOUND.DLL   - Sound bank 4 (NE, WAV audio)
+├── TC5SOUND.DLL   - Sound bank 5 (NE, WAV audio)
+├── TC6SOUND.DLL   - Sound bank 6 (NE, WAV audio)
+└── SOUNDS/        - MIDI music files
+```
+
+**TCV256.DLL Resource Types:**
+| Type | ID | Count | Content |
+|------|----|-------|---------|
+| CUSTOM_15 | 0x800F | 1 | Animation data |
+| CUSTOM_32513 | 0xFF01 | 1513 | RUND format sprites |
+
+**Sprite Extraction:**
+- Uses same RUND format as Operation Neptune and TMT
+- 1,508 sprites successfully extracted
+- Dimensions range from 14×26 to 512×384 pixels
+- Palette capture needed for correct colors
+
+---
+
 ### Operation Neptune (ONWINCD)
 ```
 ONWINCD/
