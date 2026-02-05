@@ -10,13 +10,15 @@ An open-source reimplementation of **The Learning Company's Super Solvers series
 
 | Game | Sprites | Audio | Palette | Status |
 |------|:-------:|:-----:|:-------:|--------|
-| Super Solvers: Gizmos & Gadgets | Partial | Working | TBD | Primary Focus |
+| Super Solvers: Gizmos & Gadgets | 1,893 | Working | Working | Primary Focus |
 | Super Solvers: Operation Neptune | 1,158 | Working | Working | In Progress |
 | Super Solvers: Treasure Mountain! | 760 | Working | **Needed** | Sprites Extracted |
-| Super Solvers: OutNumbered! | Blocked | 128 | Blocked | Needs RE |
-| Super Solvers: Spellbound! | Partial | - | - | Research |
-| Treasure MathStorm! | Working | - | TBD | Asset Extraction |
-| Treasure Cove! | Working | - | TBD | Asset Extraction |
+| Super Solvers: OutNumbered! | 906 | 128 | **Needed** | Partial |
+| Super Solvers: Spellbound! | 1,198 | Working | TBD | Asset Extraction |
+| Treasure MathStorm! | 1,644 | Working | **Needed** | Asset Extraction |
+| Treasure Cove! | 1,508 | Working | **Needed** | Asset Extraction |
+
+**Total: 9,067 sprite frames extracted**
 
 ### Legend
 - **Working** - Fully functional
@@ -163,7 +165,8 @@ opengg/
 
 ### Gizmos & Gadgets (Primary Focus)
 - [x] NE resource extractor
-- [x] Sprite decoder with RLE decompression
+- [x] Sprite decoder with RLE decompression (1,893 sprites from 5 DAT files)
+- [x] Doubled-byte palette extraction (CUSTOM_32515 resources)
 - [x] SDL2 renderer and audio
 - [x] Entity and room framework
 - [x] Puzzle framework (Balance, Gear)
@@ -190,15 +193,27 @@ opengg/
 
 ### OutNumbered!
 - [x] Audio extraction (60 SFX + 68 speech)
-- [ ] Sprite format reverse engineering needed
-- [ ] Palette location unknown
-- [ ] RLE compression differs from other games
+- [x] Sprite extraction (906 frames) - dimensions may be incorrect
+- [ ] Palette capture needed
+- [ ] Format verification needed
 
-### Other Games
-- [x] Treasure MathStorm - RUND sprites work
-- [x] Treasure Cove - RUND sprites work
-- [ ] Palettes need capture/research
-- [ ] Game-specific implementations
+### Treasure Cove!
+- [x] TCV256.DLL RUND sprites (1,508 sprites)
+- [x] Audio in TC*SOUND.DLL files
+- [ ] Palette capture needed
+- [ ] Game logic implementation
+
+### Treasure MathStorm!
+- [x] TMSDATA.DAT sprites (1,644 sprites)
+- [x] Audio in TMSSOUND.DAT
+- [ ] Palette capture needed
+- [ ] Game logic implementation
+
+### Spellbound! / Reading
+- [x] SSR1.DAT sprites (1,198 sprites)
+- [x] Audio in SFX.DAT, SPEECH.DAT
+- [ ] Palette verification needed
+- [ ] Game logic implementation
 
 ---
 
