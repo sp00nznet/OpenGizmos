@@ -438,8 +438,42 @@ Resource IDs indicate puzzle category:
 2. **Medium**: SSS/Spellbound Wizards (uses RGrp format)
 3. **Research Needed**: Treasure Cove, older DOS versions
 
+## Storybook Weaver Deluxe (SBW)
+
+**Publisher:** MECC (1994) -- NOT a TLC game but a related MECC educational title.
+
+Uses a completely different asset system from the Super Solvers/Treasure series.
+
+```
+STORYBOOKWEAVER.iso/
+├── SBW.EXE           - Main application (NE 16-bit Win3.1)
+├── SBWED.DLL         - Editor module (NE DLL)
+├── SCENERY.RES       - Scene artwork (5.3 MB, MECC rsrcRSED format)
+├── RESOURCE/
+│   ├── ADN0001.ADN   - Clip art data pack (8.6 MB, MECC RSRCDoug format)
+│   ├── ENG0001.ENG   - English text (246 KB, RSRCDoug)
+│   ├── SPN0001.SPN   - Spanish text (252 KB, RSRCDoug)
+│   ├── MUS0001.MUS   - Music index (plain text, 61 entries)
+│   └── SND0001.SND   - Sound FX index (plain text, 101 entries)
+├── TUNES/            - 120 WAV + 39 MIDI files
+├── STARTR00-39.STS   - 40 starter story files
+├── STRYSTRT.LST      - Story index (CSV)
+└── *.BMP             - 12 UI bitmaps (8bpp, 256-color)
+```
+
+**Key Differences from TLC Games:**
+- No NE resource sprites -- uses proprietary MECC archives (rsrcRSED / RSRCDoug)
+- Audio is standard WAV/MIDI referenced by plain text index files
+- Story files (.STS) use a simple binary format with ASCII header
+- Bilingual (English/Spanish) with separate resource packs
+
+See [STORYBOOK_WEAVER.md](STORYBOOK_WEAVER.md) for full format analysis.
+
+---
+
 ## Audio Handling
 
 - **WAV**: Embedded in NE resources (CUSTOM_32514 or CUSTOM_32519)
-- **MIDI**: Standard .MID files in MIDI/ subdirectory
-- **Speech**: Large NE files with embedded WAV
+- **WAV (SBW)**: Standalone files in TUNES/ directory, indexed by text lists
+- **MIDI**: Standard .MID files in MIDI/ subdirectory (or TUNES/ for SBW)
+- **Speech**: Large NE files with embedded WAV (or ProVoice TTS for SBW)

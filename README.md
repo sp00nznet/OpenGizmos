@@ -1,52 +1,42 @@
 # OpenGizmos
 
-An open-source reimplementation of **The Learning Company's Super Solvers series** that runs on modern systems.
+A love letter to 90s educational gaming. OpenGizmos is an open-source engine that brings **The Learning Company** and **MECC** classics back to life on modern hardware.
 
-> **Note:** You must provide your own copy of the original games. OpenGizmos extracts and converts assets on-the-fly from legitimate installations.
+> **You supply the nostalgia (and a legit copy of the games). We handle the rest.**
 
 ---
 
 ## Supported Games
 
-| Game | Sprites | Audio | Palette | Status |
-|------|:-------:|:-----:|:-------:|--------|
-| Super Solvers: Gizmos & Gadgets | 1,893 | Working | Working | Primary Focus |
-| Super Solvers: Operation Neptune | 1,158 | Working | Working | In Progress |
-| Super Solvers: Treasure Mountain! | 760 | Working | **Needed** | Sprites Extracted |
-| Super Solvers: OutNumbered! | 906 | 128 | **Needed** | Partial |
-| Super Solvers: Spellbound! | 1,198 | Working | TBD | Asset Extraction |
-| Treasure MathStorm! | 1,644 | Working | **Needed** | Asset Extraction |
-| Treasure Cove! | 1,508 | Working | **Needed** | Asset Extraction |
+### The Learning Company - Super Solvers & Treasure Series
 
-**Total: 9,067 sprite frames extracted**
+| | Game | Sprites | Audio | Status |
+|---|------|:-------:|:-----:|--------|
+| :jigsaw: | **Gizmos & Gadgets** | 1,893 | Full | Primary Focus |
+| :ocean: | **Operation Neptune** | 1,158 | Full | In Progress |
+| :mountain: | **Treasure Mountain!** | 760 | Full | Sprites Extracted |
+| :moneybag: | **OutNumbered!** | 906 | 128 | Partial |
+| :star2: | **Spellbound!** | 1,198 | Full | Asset Extraction |
+| :snowflake: | **Treasure MathStorm!** | 1,644 | Full | Asset Extraction |
+| :shell: | **Treasure Cove!** | 1,508 | Full | Asset Extraction |
 
-### Legend
-- **Working** - Fully functional
-- **Partial** - Basic extraction works
-- **Needed** - Format known, palette must be captured from running game
-- **Blocked** - Format differs, needs reverse engineering
-- **TBD** - Not yet investigated
+### MECC
 
----
+| | Game | Assets | Audio | Status |
+|---|------|:------:|:-----:|--------|
+| :book: | **Storybook Weaver Deluxe** | ~663 clip art + 40 stories | 120 SFX + 39 MIDI | Asset Discovery |
 
-## Vision
-
-Preserve and modernize the classic TLC educational games from the early 1990s by:
-- Running natively on modern Windows, macOS, and Linux
-- Supporting high-resolution displays with proper scaling
-- Maintaining authentic gameplay while improving quality-of-life
-- Documenting the original game formats for preservation
+**Total: 9,067+ sprite frames extracted across 8 games**
 
 ---
 
-## Features
+## What It Does
 
-- **Modern SDL2 Engine** - Hardware-accelerated rendering with native resolution scaling
-- **Asset Extraction** - Reads directly from original game files (.DAT, .RSC, .DLL, .GRP)
-- **Multi-Game Support** - Unified engine with game-specific logic modules
-- **Full Input Support** - Keyboard, mouse, and customizable key bindings
-- **Audio System** - Sound effects and MIDI music playback via SDL_mixer
-- **Format Documentation** - Comprehensive reverse-engineering notes for preservation
+- **Reads original game files** directly -- no manual asset ripping needed
+- **Runs natively** on modern Windows (macOS/Linux planned)
+- **Hardware-accelerated** SDL2 rendering with proper scaling
+- **Plays the music** -- MIDI and WAV audio via SDL_mixer
+- **Documents everything** -- format specs for preservation
 
 ---
 
@@ -54,198 +44,82 @@ Preserve and modernize the classic TLC educational games from the early 1990s by
 
 ### Requirements
 - Windows 10/11 (64-bit)
-- Original copy of one or more supported games
-- Visual Studio 2022 (for building from source)
+- A copy of one or more supported games
+- Visual Studio 2022 (to build from source)
 
-### Building from Source
+### Build & Run
 
 ```bash
-# Clone the repository
 git clone https://github.com/sp00nznet/OpenGizmos.git
 cd OpenGizmos
 
-# Create build directory
 mkdir build && cd build
-
-# Configure and build
 cmake .. -G "Visual Studio 17 2022" -A x64
 cmake --build . --config Release
 ```
 
-The executables will be in `build/Release/`:
-- `opengg.exe` - Main game engine
-- `asset_tool.exe` - Asset extraction utility
-
-### Running
-
 ```bash
-# Auto-detect game installation
+# Launch (auto-detect game files)
 opengg.exe
 
-# Specify game path
-opengg.exe --path "C:\Games\Gizmos"
+# Point to a specific game
+opengg.exe --path "D:\Games\Gizmos"
 
-# Fullscreen mode
-opengg.exe --fullscreen
-
-# Window scale (1-8x)
-opengg.exe --scale 3
+# Fullscreen at 3x scale
+opengg.exe --fullscreen --scale 3
 ```
 
----
+### Asset Tool
 
-## Asset Tool
-
-The `asset_tool` utility extracts and converts assets from the original games:
+Extract and inspect original game assets:
 
 ```bash
-# List resources in a file
 asset_tool list-ne GIZMO256.DAT
-asset_tool list-ne TMT256.DLL
-
-# Extract all raw resources
-asset_tool extract-ne GIZMO256.DAT output_dir/
-
-# Extract RUND format sprites (Neptune, TMT, TMS)
+asset_tool extract-ne GIZMO256.DAT output/
 asset_tool extract-rund NEP256.DLL palette.bin sprites/
-asset_tool extract-rund TMT256.DLL palette.bin sprites/
-
-# Extract indexed sprites with palette
-asset_tool extract-indexed SORTER.RSC palette.pal sprites/
-
-# Validate game installation
-asset_tool validate "C:\Games\Gizmos"
-```
-
----
-
-## Controls
-
-| Action | Key |
-|--------|-----|
-| Move | Arrow Keys / WASD |
-| Jump | Space |
-| Interact | Enter / E |
-| Pause | P / Escape |
-| Inventory | Tab / I |
-
----
-
-## Project Structure
-
-```
-opengg/
-├── src/
-│   ├── main.cpp              # Entry point
-│   ├── loader/               # Asset loading & conversion
-│   ├── engine/               # SDL2 engine (render, audio, input)
-│   ├── game/                 # Game logic (entities, rooms, puzzles)
-│   └── formats/              # File format parsers
-├── include/                  # Public headers
-├── docs/
-│   ├── GAME_FORMATS.md       # File format specifications
-│   ├── PALETTE_RESEARCH.md   # Palette extraction research
-│   └── MISSION_STRUCTURE.md  # Game progression docs
-└── libs/                     # SDL2 libraries
 ```
 
 ---
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Game Formats](docs/GAME_FORMATS.md) | NE resource format, sprite compression, room structures |
+| Doc | What's Inside |
+|-----|---------------|
+| [Building](docs/BUILDING.md) | Compilers, CMake options, IDE setup, troubleshooting |
+| [Architecture](docs/ARCHITECTURE.md) | Engine layers, entity system, state machine, data flow |
+| [Game Formats](docs/GAME_FORMATS.md) | NE resources, RLE compression, RUND sprites, room structures |
+| [Storybook Weaver](docs/STORYBOOK_WEAVER.md) | MECC resource archives, story files, clip art catalog |
 | [Palette Research](docs/PALETTE_RESEARCH.md) | Per-game palette locations and capture methods |
-| [Mission Structure](docs/MISSION_STRUCTURE.md) | Game progression and objectives |
+| [Mission Structure](docs/MISSION_STRUCTURE.md) | Game progression, puzzles, objectives for each title |
+| [File Formats](docs/FILE_FORMATS.md) | NE DLL, GRP archive, Smacker video, MIDI specs |
+| [Development](docs/DEVELOPMENT.md) | Per-game progress checklists and project structure |
+| [Contributing](docs/CONTRIBUTING.md) | How to help -- palettes, formats, game logic, testing |
 
 ---
 
-## Development Status
+## Want to Help?
 
-### Gizmos & Gadgets (Primary Focus)
-- [x] NE resource extractor
-- [x] Sprite decoder with RLE decompression (1,893 sprites from 5 DAT files)
-- [x] Doubled-byte palette extraction (CUSTOM_32515 resources)
-- [x] SDL2 renderer and audio
-- [x] Entity and room framework
-- [x] Puzzle framework (Balance, Gear)
-- [ ] Complete puzzle implementations (8 types)
-- [ ] Vehicle building system
-- [ ] Racing minigame
-- [ ] Morty AI
+The biggest needs right now:
 
-### Operation Neptune
-- [x] RSC file format decoder
-- [x] Palette extraction (doubled-byte format)
-- [x] SORTER.RSC sprites (495 sprites)
-- [x] NEP256.DLL RUND sprites (1,158 sprites)
-- [x] Labyrinth/Reader tilemap decoder (640x480)
-- [ ] Puzzle implementations
-- [ ] Submarine navigation
+1. **Palette capture** -- Several games need VGA palettes dumped from runtime
+2. **MECC format RE** -- Storybook Weaver's resource archives need cracking open
+3. **Game logic** -- Puzzles, AI, progression systems
+4. **Testing** -- Validate extraction across different game versions
 
-### Treasure Mountain!
-- [x] TMT256.DLL RUND format sprites (760 sprites)
-- [x] Correct sprite dimensions extracted
-- [x] Audio extraction from TM*SOUND.DLL
-- [ ] **Palette capture needed** - see [Palette Research](docs/PALETTE_RESEARCH.md)
-- [ ] Game logic implementation
-
-### OutNumbered!
-- [x] Audio extraction (60 SFX + 68 speech)
-- [x] Sprite extraction (906 frames) - dimensions may be incorrect
-- [ ] Palette capture needed
-- [ ] Format verification needed
-
-### Treasure Cove!
-- [x] TCV256.DLL RUND sprites (1,508 sprites)
-- [x] Audio in TC*SOUND.DLL files
-- [ ] Palette capture needed
-- [ ] Game logic implementation
-
-### Treasure MathStorm!
-- [x] TMSDATA.DAT sprites (1,644 sprites)
-- [x] Audio in TMSSOUND.DAT
-- [ ] Palette capture needed
-- [ ] Game logic implementation
-
-### Spellbound! / Reading
-- [x] SSR1.DAT sprites (1,198 sprites)
-- [x] Audio in SFX.DAT, SPEECH.DAT
-- [ ] Palette verification needed
-- [ ] Game logic implementation
-
----
-
-## Contributing
-
-Contributions are welcome! Areas that need help:
-
-1. **Palette Capture** - Running games in debugger to dump VGA palettes
-2. **Format RE** - OutNumbered sprite format differs from other games
-3. **Game Logic** - Implementing puzzles, AI, progression systems
-4. **Testing** - Validating extraction across different game versions
-
-See [PALETTE_RESEARCH.md](docs/PALETTE_RESEARCH.md) for palette capture instructions.
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
 ---
 
 ## Legal
 
-OpenGizmos is a clean-room reimplementation. It does not contain any copyrighted assets from the original games. You must own a legitimate copy of the supported games to play.
+OpenGizmos is a clean-room reimplementation. No copyrighted assets are included. You must own legitimate copies of the supported games.
 
-This project is not affiliated with or endorsed by The Learning Company, SoftKey, or any current rights holders.
+Not affiliated with The Learning Company, MECC, SoftKey, or any current rights holders.
 
----
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
+**License:** [MIT](LICENSE)
 
 ---
 
-## Acknowledgments
-
-- Original games by The Learning Company (1990-1994)
-- SDL2 library by the SDL Community
-- Inspired by preservation projects like OpenMW, DevilutionX, and OpenRA
+*Inspired by preservation projects like OpenMW, DevilutionX, and OpenRA.*
+*Original games by The Learning Company (1990-1994) and MECC (1994).*
+*Built with [SDL2](https://www.libsdl.org/).*
