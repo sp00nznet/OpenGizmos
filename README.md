@@ -1,12 +1,14 @@
 # OpenGG
 
-An open-source engine for **The Learning Company** educational games from the 90s. OpenGG extracts, loads, and runs 8 classic TLC titles from a single unified launcher.
+An open-source engine for **The Learning Company** and **MECC** educational games from the 90s. OpenGG extracts, loads, and runs classic titles from a single unified launcher.
 
 > **You supply a legit copy of the games. We handle the rest.**
 
 ---
 
 ## Supported Games
+
+### The Learning Company -- Super Solvers & Treasure Series
 
 | Game | ID | Sprites | WAV | MIDI | Puzzles | Status |
 |------|----|--------:|----:|-----:|--------:|--------|
@@ -19,7 +21,13 @@ An open-source engine for **The Learning Company** educational games from the 90
 | **Treasure Mountain!** | `tmt` | 760 | 2,861 | 20 | 478 | Asset Extraction |
 | **Spellbound Wizards** | `ssb` | 471 | 1,638 | -- | 3 | Asset Extraction |
 
-**11,740 sprites, 9,870 sound effects, 169 MIDI tracks extracted across 8 games.**
+### MECC
+
+| Game | Assets | Audio | Status |
+|------|:------:|:-----:|--------|
+| **Storybook Weaver Deluxe** | ~663 clip art + 40 stories | 120 SFX + 39 MIDI | Asset Discovery |
+
+**11,740+ sprites, 9,870+ sound effects, 169 MIDI tracks extracted across 9 games.**
 
 ---
 
@@ -135,9 +143,9 @@ extracted/
 Biggest needs:
 
 1. **Palette capture** -- several games need VGA palettes dumped from runtime
-2. **Game logic** -- puzzles, AI, progression systems for each title
-3. **Testing** -- validate extraction across different game versions
-4. **New game states** -- implement gameplay for titles beyond Neptune/Gizmos
+2. **MECC format RE** -- Storybook Weaver's resource archives need cracking open
+3. **Game logic** -- puzzles, AI, progression systems for each title
+4. **Testing** -- validate extraction across different game versions
 
 See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
@@ -148,12 +156,12 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 OpenGG is a clean-room reimplementation. No copyrighted assets are included.
 You must own legitimate copies of the supported games.
 
-Not affiliated with The Learning Company, SoftKey, or any current rights holders.
+Not affiliated with The Learning Company, MECC, SoftKey, or any current rights holders.
 
 **License:** [MIT](LICENSE)
 
 ---
 
 *Inspired by [OpenMW](https://openmw.org), [DevilutionX](https://github.com/diasurgical/DevilutionX), and [OpenRA](https://www.openra.net).*
-*Original games by The Learning Company (1990-1994).*
+*Original games by The Learning Company (1990-1994) and MECC (1994).*
 *Built with [SDL2](https://www.libsdl.org/).*

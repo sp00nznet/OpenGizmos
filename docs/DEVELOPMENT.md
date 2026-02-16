@@ -109,6 +109,24 @@ Progress tracking for all supported games.
 - [x] Audio extraction
 - [ ] Game logic implementation
 
+### Storybook Weaver Deluxe (MECC)
+
+~663 clip art + 40 stories | 120 SFX + 39 MIDI
+
+- [x] ISO structure mapped
+- [x] Audio assets identified (120 WAV + 39 MIDI)
+- [x] BMP assets identified (12 UI images)
+- [x] Story file format (.STS) partially decoded
+- [x] Starter stories catalogued (40 stories)
+- [x] Clip art categories catalogued (~663 objects)
+- [ ] MECC resource archive decoder (rsrcRSED / RSRCDoug formats)
+- [ ] SCENERY.RES extraction (scene backgrounds)
+- [ ] ADN0001.ADN extraction (clip art sprites)
+- [ ] Story file (.STS) full parser
+- [ ] Text-to-speech integration
+- [ ] Story editor UI
+- [ ] Print system
+
 ---
 
 ## Controls
