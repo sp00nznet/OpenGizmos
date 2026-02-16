@@ -41,6 +41,8 @@ An open-source engine for **The Learning Company** and **MECC** educational game
 - **Asset viewer** -- browse sprites, play sounds, preview MIDI for any loaded game
 - **Extensible** -- game-specific states (Neptune submarine, Gizmos puzzles) plug into a shared engine
 
+![Game List](docs/images/game-list.png)
+
 ---
 
 ## Quick Start
