@@ -26,16 +26,18 @@ void GameRegistry::populateKnownGames() {
     struct KnownGame {
         const char* id;
         const char* name;
+        const char* company;
     };
     static const KnownGame knownGames[] = {
-        {"ssg", "Super Solvers: Gizmos & Gadgets"},
-        {"on",  "Operation Neptune"},
-        {"tms", "Treasure MathStorm!"},
-        {"tcv", "Treasure Cove!"},
-        {"ssr", "Super Solvers: Spellbound!"},
-        {"sso", "Super Solvers: OutNumbered!"},
-        {"tmt", "Treasure Mountain!"},
-        {"ssb", "Super Solvers: Spellbound Wizards"},
+        {"ssg", "Super Solvers: Gizmos & Gadgets", "TLC"},
+        {"on",  "Operation Neptune",               "TLC"},
+        {"tms", "Treasure MathStorm!",             "TLC"},
+        {"tcv", "Treasure Cove!",                  "TLC"},
+        {"ssr", "Super Solvers: Spellbound!",      "TLC"},
+        {"sso", "Super Solvers: OutNumbered!",     "TLC"},
+        {"tmt", "Treasure Mountain!",              "TLC"},
+        {"ssb", "Super Solvers: Spellbound Wizards", "TLC"},
+        {"sbw", "Storybook Weaver Deluxe",         "MECC"},
     };
 
     for (const auto& kg : knownGames) {
@@ -43,7 +45,7 @@ void GameRegistry::populateKnownGames() {
             GameInfo info;
             info.id = kg.id;
             info.name = kg.name;
-            info.company = "TLC";
+            info.company = kg.company;
             info.available = false;
             games_[info.id] = info;
             gameOrder_.push_back(info.id);
