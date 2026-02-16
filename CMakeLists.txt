@@ -49,6 +49,7 @@ set(GAME_SOURCES
     src/game/room.cpp
     src/game/puzzle.cpp
     src/game/player.cpp
+    src/game/game_registry.cpp
 )
 
 set(BOT_SOURCES

@@ -4,6 +4,7 @@
 #include "input.h"
 #include "asset_cache.h"
 #include "font.h"
+#include "game_registry.h"
 #include "bot/bot_manager.h"
 #include "neptune/neptune_game.h"
 #ifdef _WIN32
@@ -143,6 +144,29 @@ bool Game::initialize(const GameConfig& config) {
         });
     }
 #endif
+
+    // Initialize game registry and discover extracted games
+    gameRegistry_ = std::make_unique<GameRegistry>();
+    {
+        // Search for extracted games directory relative to the executable or known paths
+        std::vector<std::string> extractedPaths = {
+            "C:/ggng/extracted",
+            "../extracted",
+            "./extracted",
+            config_.gamePath + "/extracted",
+        };
+
+        for (const auto& path : extractedPaths) {
+            if (fs::exists(path + "/all_games_manifest.json")) {
+                if (gameRegistry_->discoverGames(path)) {
+                    // Configure asset cache to use extracted base path
+                    assetCache_->setExtractedBasePath(path);
+                    SDL_Log("Found extracted games at: %s", path.c_str());
+                    break;
+                }
+            }
+        }
+    }
 
     // Load config
     loadConfig();
@@ -284,6 +308,7 @@ void Game::shutdown() {
     assetViewer_.reset();
     menuBar_.reset();
 #endif
+    gameRegistry_.reset();
     textRenderer_.reset();
     assetCache_.reset();
     input_.reset();
@@ -336,7 +361,24 @@ GameState* Game::getCurrentState() {
 }
 
 bool Game::detectGame() {
-    // Common installation paths to check
+    // First, check for extracted games (the multi-game launcher path)
+    std::vector<std::string> extractedPaths = {
+        "C:/ggng/extracted",
+        "../extracted",
+        "./extracted",
+    };
+
+    for (const auto& path : extractedPaths) {
+        if (fs::exists(path + "/all_games_manifest.json")) {
+            SDL_Log("Found extracted games manifest at: %s", path.c_str());
+            // Use parent of extracted dir as the game path
+            config_.gamePath = fs::path(path).parent_path().string();
+            if (config_.gamePath.empty()) config_.gamePath = ".";
+            return true;
+        }
+    }
+
+    // Legacy: search for original Gizmos & Gadgets installation
     std::vector<std::string> searchPaths = {
         ".",
         "./SSGWIN32",
@@ -346,7 +388,6 @@ bool Game::detectGame() {
         "C:/Program Files/TLC/Gizmos & Gadgets",
     };
 
-    // Key files that must exist (just need the assets, not the original exe)
     std::vector<std::string> requiredFiles = {
         "SSGWINCD/GIZMO.DAT",
     };
@@ -367,16 +408,9 @@ bool Game::detectGame() {
         }
     }
 
-    // Game not found - run in demo mode
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Demo Mode",
-        "Original game files not found.\n\n"
-        "Running in DEMO MODE with placeholder graphics.\n"
-        "To play with real assets, install the original game\n"
-        "or use: opengg.exe --path \"C:\\path\\to\\game\"",
-        nullptr);
-
-    config_.gamePath = ".";  // Use current directory as placeholder
-    return true;  // Allow running in demo mode
+    // No game files found - run in demo/launcher mode anyway
+    config_.gamePath = ".";
+    return true;
 }
 
 bool Game::loadConfig() {
@@ -406,6 +440,11 @@ bool Game::loadConfig() {
             config_.vsync = (value == "true" || value == "1");
         } else if (key == "gamePath") {
             config_.gamePath = value;
+        } else if (key == "extractedPath") {
+            if (assetCache_) assetCache_->setExtractedBasePath(value);
+            if (gameRegistry_ && gameRegistry_->getAvailableCount() == 0) {
+                gameRegistry_->discoverGames(value);
+            }
         } else if (key == "sfxVolume") {
             if (audio_) audio_->setSFXVolume(std::stof(value));
         } else if (key == "musicVolume") {
@@ -423,10 +462,13 @@ bool Game::saveConfig() {
         return false;
     }
 
-    file << "# OpenGizmos Configuration\n\n";
+    file << "# OpenGG Configuration\n\n";
     file << "fullscreen=" << (config_.fullscreen ? "true" : "false") << "\n";
     file << "vsync=" << (config_.vsync ? "true" : "false") << "\n";
     file << "gamePath=" << config_.gamePath << "\n";
+    if (assetCache_ && !assetCache_->getExtractedBasePath().empty()) {
+        file << "extractedPath=" << assetCache_->getExtractedBasePath() << "\n";
+    }
 
     if (audio_) {
         file << "sfxVolume=" << audio_->getSFXVolume() << "\n";
@@ -456,7 +498,7 @@ bool Game::browseForGameFolder() {
     pFileDialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
 
     // Set title
-    pFileDialog->SetTitle(L"Select Gizmos & Gadgets Installation Folder");
+    pFileDialog->SetTitle(L"Select Game Installation Folder");
 
     // Show the dialog
     hr = pFileDialog->Show(hwnd);
@@ -533,8 +575,11 @@ bool Game::browseForGameFolder() {
 void Game::handleMenuCommand(int menuId) {
     switch (menuId) {
         // File menu
-        case ID_FILE_NEW_GAME:
+        case ID_FILE_SELECT_GAME:
             if (onNewGame_) onNewGame_();
+            break;
+        case ID_FILE_IMPORT_GAME:
+            browseForGameFolder();
             break;
         case ID_FILE_SAVE:
             SDL_Log("Menu: Save");
@@ -663,12 +708,15 @@ void Game::handleMenuCommand(int menuId) {
 
         // About menu
         case ID_ABOUT_INFO:
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About OpenGizmos",
-                "OpenGizmos v0.1.0\n\n"
-                "A modern reimplementation of Super Solvers: Gizmos & Gadgets\n\n"
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About OpenGG",
+                "OpenGG v0.2.0\n\n"
+                "A multi-game launcher for TLC Educational Games\n"
+                "Supports: Gizmos & Gadgets, Operation Neptune,\n"
+                "OutNumbered!, Spellbound!, Treasure Cove!,\n"
+                "Treasure MathStorm!, Treasure Mountain!, and more.\n\n"
                 "This is an open-source project that requires the original game files.\n"
                 "No copyrighted assets are included.\n\n"
-                "https://github.com/sp00nznet/OpenGizmos",
+                "https://github.com/sp00nznet/OpenGG",
                 renderer_ ? renderer_->getSDLWindow() : nullptr);
             break;
 

@@ -15,6 +15,7 @@ class AssetCache;
 class TextRenderer;
 class MenuBar;
 class AssetViewerWindow;
+class GameRegistry;
 
 // Game state interface
 class GameState {
@@ -68,6 +69,7 @@ public:
     InputSystem* getInput() { return input_.get(); }
     AssetCache* getAssetCache() { return assetCache_.get(); }
     TextRenderer* getTextRenderer() { return textRenderer_.get(); }
+    GameRegistry* getGameRegistry() { return gameRegistry_.get(); }
 #ifdef _WIN32
     MenuBar* getMenuBar() { return menuBar_.get(); }
 #endif
@@ -112,6 +114,7 @@ private:
     std::unique_ptr<InputSystem> input_;
     std::unique_ptr<AssetCache> assetCache_;
     std::unique_ptr<TextRenderer> textRenderer_;
+    std::unique_ptr<GameRegistry> gameRegistry_;
 #ifdef _WIN32
     std::unique_ptr<MenuBar> menuBar_;
     std::unique_ptr<AssetViewerWindow> assetViewer_;

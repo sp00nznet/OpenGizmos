@@ -872,4 +872,196 @@ SDL_Texture* AssetCache::createTextureFromBitmap(const std::vector<uint8_t>& bit
 #endif
 }
 
+// === Extracted asset loading ===
+
+SDL_Texture* AssetCache::loadExtractedTexture(const std::string& gameId, const std::string& spriteName,
+                                                int* outWidth, int* outHeight) {
+#ifdef SDL_h_
+    if (!renderer_) {
+        lastError_ = "No renderer set";
+        return nullptr;
+    }
+
+    // Build cache key
+    std::string cacheKey = "extracted:" + gameId + ":sprite:" + spriteName;
+
+    // Check memory cache
+    auto it = textures_.find(cacheKey);
+    if (it != textures_.end()) {
+        it->second.refCount++;
+        stats_.cacheHits++;
+        if (outWidth) *outWidth = it->second.width;
+        if (outHeight) *outHeight = it->second.height;
+        return it->second.texture;
+    }
+
+    stats_.cacheMisses++;
+
+    // Build file path
+    std::string basePath = extractedBasePath_.empty() ? gamePath_ : extractedBasePath_;
+    std::string filePath = basePath + "/" + gameId + "/sprites/" + spriteName;
+
+    // Try with .bmp extension if not already present
+    if (!fs::exists(filePath)) {
+        filePath += ".bmp";
+    }
+    if (!fs::exists(filePath)) {
+        // Try without extension variations
+        std::string dir = basePath + "/" + gameId + "/sprites/";
+        if (fs::exists(dir)) {
+            for (const auto& entry : fs::directory_iterator(dir)) {
+                std::string fname = entry.path().stem().string();
+                if (fname == spriteName) {
+                    filePath = entry.path().string();
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!fs::exists(filePath)) {
+        lastError_ = "Extracted sprite not found: " + filePath;
+        return nullptr;
+    }
+
+    // Load BMP directly via SDL
+    SDL_Surface* surface = SDL_LoadBMP(filePath.c_str());
+    if (!surface) {
+        lastError_ = "Failed to load BMP: " + std::string(SDL_GetError());
+        return nullptr;
+    }
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
+    if (!texture) {
+        lastError_ = "Failed to create texture: " + std::string(SDL_GetError());
+        SDL_FreeSurface(surface);
+        return nullptr;
+    }
+
+    // Cache
+    CachedTexture ct;
+    ct.texture = texture;
+    ct.width = surface->w;
+    ct.height = surface->h;
+    ct.refCount = 1;
+    textures_[cacheKey] = ct;
+
+    if (outWidth) *outWidth = surface->w;
+    if (outHeight) *outHeight = surface->h;
+
+    SDL_FreeSurface(surface);
+    stats_.texturesLoaded++;
+    return texture;
+#else
+    return nullptr;
+#endif
+}
+
+Mix_Chunk* AssetCache::loadExtractedSound(const std::string& gameId, const std::string& soundName) {
+#ifdef SDL_h_
+    std::string cacheKey = "extracted:" + gameId + ":wav:" + soundName;
+
+    auto it = sounds_.find(cacheKey);
+    if (it != sounds_.end()) {
+        stats_.cacheHits++;
+        return it->second;
+    }
+
+    stats_.cacheMisses++;
+
+    std::string basePath = extractedBasePath_.empty() ? gamePath_ : extractedBasePath_;
+    std::string filePath = basePath + "/" + gameId + "/audio/wav/" + soundName;
+
+    if (!fs::exists(filePath)) {
+        filePath += ".wav";
+    }
+    if (!fs::exists(filePath)) {
+        lastError_ = "Extracted sound not found: " + filePath;
+        return nullptr;
+    }
+
+    Mix_Chunk* chunk = Mix_LoadWAV(filePath.c_str());
+    if (chunk) {
+        sounds_[cacheKey] = chunk;
+        stats_.soundsLoaded++;
+    } else {
+        lastError_ = "Failed to load WAV: " + std::string(Mix_GetError());
+    }
+    return chunk;
+#else
+    return nullptr;
+#endif
+}
+
+Mix_Music* AssetCache::loadExtractedMusic(const std::string& gameId, const std::string& midiName) {
+#ifdef SDL_h_
+    std::string cacheKey = "extracted:" + gameId + ":midi:" + midiName;
+
+    auto it = music_.find(cacheKey);
+    if (it != music_.end()) {
+        stats_.cacheHits++;
+        return it->second;
+    }
+
+    stats_.cacheMisses++;
+
+    std::string basePath = extractedBasePath_.empty() ? gamePath_ : extractedBasePath_;
+    std::string filePath = basePath + "/" + gameId + "/audio/midi/" + midiName;
+
+    if (!fs::exists(filePath)) {
+        filePath += ".mid";
+    }
+    if (!fs::exists(filePath)) {
+        lastError_ = "Extracted MIDI not found: " + filePath;
+        return nullptr;
+    }
+
+    Mix_Music* mus = Mix_LoadMUS(filePath.c_str());
+    if (mus) {
+        music_[cacheKey] = mus;
+    } else {
+        lastError_ = "Failed to load MIDI: " + std::string(Mix_GetError());
+    }
+    return mus;
+#else
+    return nullptr;
+#endif
+}
+
+std::vector<std::string> AssetCache::listExtractedAssets(const std::string& gameId, const std::string& category) {
+    std::vector<std::string> result;
+
+    std::string basePath = extractedBasePath_.empty() ? gamePath_ : extractedBasePath_;
+    std::string dirPath;
+
+    if (category == "sprites") {
+        dirPath = basePath + "/" + gameId + "/sprites";
+    } else if (category == "wav") {
+        dirPath = basePath + "/" + gameId + "/audio/wav";
+    } else if (category == "midi") {
+        dirPath = basePath + "/" + gameId + "/audio/midi";
+    } else if (category == "puzzles") {
+        dirPath = basePath + "/" + gameId + "/puzzles";
+    } else if (category == "rooms") {
+        dirPath = basePath + "/" + gameId + "/rooms";
+    } else if (category == "video") {
+        dirPath = basePath + "/" + gameId + "/video";
+    } else {
+        dirPath = basePath + "/" + gameId + "/" + category;
+    }
+
+    if (!fs::exists(dirPath) || !fs::is_directory(dirPath)) {
+        return result;
+    }
+
+    for (const auto& entry : fs::directory_iterator(dirPath)) {
+        if (entry.is_regular_file()) {
+            result.push_back(entry.path().filename().string());
+        }
+    }
+
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
 } // namespace opengg

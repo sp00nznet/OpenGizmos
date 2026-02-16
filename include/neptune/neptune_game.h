@@ -188,8 +188,11 @@ private:
     std::unordered_map<int, NeptuneRoom> rooms_;
     NeptuneRoom* currentRoom_ = nullptr;
 
-    // Textures
+    // Textures (loaded from extracted assets when available)
     SDL_Texture* submarineTexture_ = nullptr;
+    int submarineTexW_ = 0;
+    int submarineTexH_ = 0;
+    SDL_Texture* backgroundTexture_ = nullptr;
     SDL_Texture* canisterTexture_ = nullptr;
     SDL_Texture* oxygenStationTexture_ = nullptr;
     SDL_Texture* fuelStationTexture_ = nullptr;

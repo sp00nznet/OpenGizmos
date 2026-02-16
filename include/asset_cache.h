@@ -125,6 +125,26 @@ public:
     // Create texture from bitmap resource data (for preview)
     SDL_Texture* createTextureFromBitmap(const std::vector<uint8_t>& bitmapData, int* outWidth = nullptr, int* outHeight = nullptr);
 
+    // === Extracted asset loading (pre-extracted BMP/WAV/MIDI files) ===
+
+    // Set the base path where extracted game directories live
+    void setExtractedBasePath(const std::string& path) { extractedBasePath_ = path; }
+    std::string getExtractedBasePath() const { return extractedBasePath_; }
+
+    // Load a texture from extracted/<gameId>/sprites/<spriteName>.bmp
+    SDL_Texture* loadExtractedTexture(const std::string& gameId, const std::string& spriteName,
+                                       int* outWidth = nullptr, int* outHeight = nullptr);
+
+    // Load a sound from extracted/<gameId>/audio/wav/<soundName>.wav
+    Mix_Chunk* loadExtractedSound(const std::string& gameId, const std::string& soundName);
+
+    // Load music from extracted/<gameId>/audio/midi/<midiName>.mid
+    Mix_Music* loadExtractedMusic(const std::string& gameId, const std::string& midiName);
+
+    // List files in an extracted game's asset directory
+    // category: "sprites", "wav", "midi", "puzzles", "rooms", "video"
+    std::vector<std::string> listExtractedAssets(const std::string& gameId, const std::string& category);
+
     // Asset ID helpers
     static std::string makeAssetId(const std::string& source, const std::string& type, int id);
     static bool parseAssetId(const std::string& assetId, std::string& source, std::string& type, int& id);
@@ -167,6 +187,9 @@ private:
     mutable Stats stats_ = {};
 
     std::string lastError_;
+
+    // Extracted assets base path (e.g., "C:/ggng/extracted")
+    std::string extractedBasePath_;
 };
 
 } // namespace opengg

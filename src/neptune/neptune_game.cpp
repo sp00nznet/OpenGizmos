@@ -3,6 +3,7 @@
 #include "audio.h"
 #include "input.h"
 #include "asset_cache.h"
+#include "game_registry.h"
 #include "font.h"
 #include <SDL.h>
 #include <cmath>
@@ -189,10 +190,39 @@ void NeptuneGameState::changeSection(NeptuneSection section) {
 void NeptuneGameState::loadAssets() {
     AssetCache* cache = game_->getAssetCache();
 
-    // For now, we'll use placeholder textures
-    // In full implementation, load from SORTER.RSC, etc.
-
     SDL_Log("Neptune: Loading assets...");
+
+    // Try to load extracted sprites from extracted/on/sprites/
+    if (cache && !cache->getExtractedBasePath().empty()) {
+        // List available sprites for Neptune
+        auto sprites = cache->listExtractedAssets("on", "sprites");
+        SDL_Log("Neptune: Found %zu extracted sprites", sprites.size());
+
+        // Try loading the submarine sprite (common sprite names)
+        submarineTexture_ = cache->loadExtractedTexture("on", "submarine",
+                                                         &submarineTexW_, &submarineTexH_);
+        if (!submarineTexture_) {
+            // Try alternate names
+            submarineTexture_ = cache->loadExtractedTexture("on", "sub",
+                                                             &submarineTexW_, &submarineTexH_);
+        }
+
+        // Try loading background
+        backgroundTexture_ = cache->loadExtractedTexture("on", "background",
+                                                          nullptr, nullptr);
+        if (!backgroundTexture_) {
+            backgroundTexture_ = cache->loadExtractedTexture("on", "ocean_bg",
+                                                              nullptr, nullptr);
+        }
+
+        // Load sounds
+        auto wavFiles = cache->listExtractedAssets("on", "wav");
+        SDL_Log("Neptune: Found %zu extracted WAV files", wavFiles.size());
+
+        // Load music
+        auto midiFiles = cache->listExtractedAssets("on", "midi");
+        SDL_Log("Neptune: Found %zu extracted MIDI files", midiFiles.size());
+    }
 }
 
 void NeptuneGameState::loadRooms() {
@@ -472,48 +502,58 @@ void NeptuneGameState::checkRoomTransition() {
 void NeptuneGameState::renderBackground() {
     Renderer* renderer = game_->getRenderer();
 
-    // Draw gradient background for underwater effect
-    SDL_Color topColor = {0, 20, 60, 255};
-    SDL_Color bottomColor = {0, 40, 100, 255};
-
-    // For now, just clear to a solid color
-    renderer->clear({0, 30, 80, 255});
-
-    // TODO: Draw actual background from LABRNTH resources
+    // Use extracted background texture if available
+    if (backgroundTexture_) {
+        renderer->drawSprite(backgroundTexture_, 0, 0);
+    } else {
+        // Fallback: solid underwater color
+        renderer->clear({0, 30, 80, 255});
+    }
 }
 
 void NeptuneGameState::renderSubmarine() {
     Renderer* renderer = game_->getRenderer();
 
-    // Draw submarine as a simple shape for now
-    Rect subRect(
-        static_cast<int>(submarine_.x - 20),
-        static_cast<int>(submarine_.y - 15),
-        40, 30
-    );
-
-    // Body
-    renderer->fillRect(subRect, Color(255, 200, 50, 255));
-
-    // Viewport
-    Rect viewport(
-        static_cast<int>(submarine_.x - 8),
-        static_cast<int>(submarine_.y - 5),
-        16, 10
-    );
-    renderer->fillRect(viewport, Color(100, 200, 255, 255));
-
-    // Propeller indicator based on velocity
-    float speed = std::sqrt(submarine_.velocityX * submarine_.velocityX +
-                           submarine_.velocityY * submarine_.velocityY);
-    if (speed > 5.0f) {
-        // Draw propeller "wake"
-        Rect wake(
-            static_cast<int>(submarine_.x - 30),
-            static_cast<int>(submarine_.y - 3),
-            10, 6
+    // Use extracted sprite if available
+    if (submarineTexture_) {
+        int drawW = submarineTexW_ > 0 ? submarineTexW_ : 40;
+        int drawH = submarineTexH_ > 0 ? submarineTexH_ : 30;
+        Rect destRect(
+            static_cast<int>(submarine_.x - drawW / 2),
+            static_cast<int>(submarine_.y - drawH / 2),
+            drawW, drawH
         );
-        renderer->fillRect(wake, Color(150, 200, 255, 128));
+        renderer->drawSprite(submarineTexture_, destRect);
+    } else {
+        // Fallback: placeholder shapes
+        Rect subRect(
+            static_cast<int>(submarine_.x - 20),
+            static_cast<int>(submarine_.y - 15),
+            40, 30
+        );
+
+        // Body
+        renderer->fillRect(subRect, Color(255, 200, 50, 255));
+
+        // Viewport
+        Rect viewport(
+            static_cast<int>(submarine_.x - 8),
+            static_cast<int>(submarine_.y - 5),
+            16, 10
+        );
+        renderer->fillRect(viewport, Color(100, 200, 255, 255));
+
+        // Propeller indicator based on velocity
+        float speed = std::sqrt(submarine_.velocityX * submarine_.velocityX +
+                               submarine_.velocityY * submarine_.velocityY);
+        if (speed > 5.0f) {
+            Rect wake(
+                static_cast<int>(submarine_.x - 30),
+                static_cast<int>(submarine_.y - 3),
+                10, 6
+            );
+            renderer->fillRect(wake, Color(150, 200, 255, 128));
+        }
     }
 }
 

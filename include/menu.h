@@ -12,10 +12,11 @@ namespace opengg {
 // Menu item IDs
 enum MenuID {
     // File menu
-    ID_FILE_NEW_GAME = 1001,
+    ID_FILE_SELECT_GAME = 1001,
     ID_FILE_SAVE,
     ID_FILE_SAVE_AS,
     ID_FILE_LOAD,
+    ID_FILE_IMPORT_GAME,
     ID_FILE_EXIT,
 
     // Config menu

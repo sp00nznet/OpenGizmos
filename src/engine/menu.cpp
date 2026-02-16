@@ -64,11 +64,13 @@ void MenuBar::createMenus() {
 
     // === File Menu ===
     fileMenu_ = CreatePopupMenu();
-    AppendMenuW(fileMenu_, MF_STRING, ID_FILE_NEW_GAME, L"&New Game\tCtrl+N");
+    AppendMenuW(fileMenu_, MF_STRING, ID_FILE_SELECT_GAME, L"&Select Game...\tCtrl+N");
     AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_SAVE, L"&Save\tCtrl+S");
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_SAVE_AS, L"Save &As...\tCtrl+Shift+S");
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_LOAD, L"&Load...\tCtrl+O");
+    AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(fileMenu_, MF_STRING, ID_FILE_IMPORT_GAME, L"&Import Game Directory...");
     AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_EXIT, L"E&xit\tAlt+F4");
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu_), L"&File");
