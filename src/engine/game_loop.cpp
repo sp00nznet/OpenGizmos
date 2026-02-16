@@ -217,6 +217,9 @@ void Game::processFrame() {
         if (!paused_) {
             state->update(deltaTime_);
 
+            // Re-fetch state -- update() may have called changeState/pushState/popState
+            state = getCurrentState();
+
             // Update bot system
             auto& botMgr = Bot::BotManager::getInstance();
             if (botMgr.isEnabled()) {
@@ -228,6 +231,17 @@ void Game::processFrame() {
                     botMgr.executeDecision(input_.get());
                 }
             }
+        }
+
+        // Re-fetch state -- handleInput() may also change states
+        state = getCurrentState();
+
+        if (!state) {
+            renderer_->clear();
+            renderer_->present();
+            input_->endFrame();
+            frameCount_++;
+            return;
         }
 
         // Render

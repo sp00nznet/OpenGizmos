@@ -116,7 +116,7 @@ private:
     float fadeProgress_ = 0.0f;
 };
 
-// Game Selection state - shows list of all known games
+// Game Selection state - RPCS3-style table with columns and rows
 class GameSelectionState : public GameState {
 public:
     explicit GameSelectionState(Game* game) : game_(game) {}
@@ -126,7 +126,12 @@ public:
         selectedIndex_ = 0;
         scrollOffset_ = 0;
 
-        // Get ALL known games (available + unavailable)
+        refreshGameList();
+    }
+
+    void exit() override {}
+
+    void refreshGameList() {
         GameRegistry* registry = game_->getGameRegistry();
         if (registry) {
             games_ = registry->getAllGames();
@@ -136,8 +141,6 @@ public:
                 games_.size(), game_->getGameRegistry() ? game_->getGameRegistry()->getAvailableCount() : 0);
     }
 
-    void exit() override {}
-
     void update(float dt) override {
         animTimer_ += dt;
     }
@@ -146,117 +149,159 @@ public:
         Renderer* renderer = game_->getRenderer();
         TextRenderer* text = game_->getTextRenderer();
 
-        renderer->clear(Color(15, 20, 35));
+        renderer->clear(Color(20, 22, 30));
 
         if (!text) return;
 
-        // Header bar
-        renderer->fillRect(Rect(0, 0, 640, 40), Color(30, 40, 70));
-        text->drawTextAligned(renderer, "SELECT A GAME", 0, 12, 640, TextAlign::Center,
-                            TextColor(255, 255, 100));
+        // Column layout
+        // | Name                    | ID   | Status      | Sprites | WAV   | MIDI |
+        const int colName   = 8;
+        const int colId     = 310;
+        const int colStatus = 360;
+        const int colSprite = 468;
+        const int colWav    = 530;
+        const int colMidi   = 592;
+        const int tableW    = 632;
+
+        // Header row (column titles)
+        int headerY = 4;
+        renderer->fillRect(Rect(4, headerY, tableW, 20), Color(40, 44, 60));
+
+        TextColor headerColor(160, 170, 200);
+        text->drawText(renderer, "Name",    colName,   headerY + 4, headerColor);
+        text->drawText(renderer, "ID",      colId,     headerY + 4, headerColor);
+        text->drawText(renderer, "Status",  colStatus, headerY + 4, headerColor);
+        text->drawText(renderer, "Sprites", colSprite, headerY + 4, headerColor);
+        text->drawText(renderer, "WAV",     colWav,    headerY + 4, headerColor);
+        text->drawText(renderer, "MIDI",    colMidi,   headerY + 4, headerColor);
+
+        // Separator line
+        renderer->fillRect(Rect(4, headerY + 20, tableW, 1), Color(60, 65, 80));
 
         if (games_.empty()) {
-            text->drawTextAligned(renderer, "No games configured.", 0, 200, 640, TextAlign::Center,
-                                TextColor(200, 100, 100));
+            text->drawTextAligned(renderer, "No games found. Right-click to import game data.",
+                                 0, 200, 640, TextAlign::Center, TextColor(150, 120, 100));
             return;
         }
 
-        // Game list: single column, full width
-        int cardW = 590;
-        int cardH = 44;
-        int padY = 4;
-        int startX = (640 - cardW) / 2;
-        int startY = 50;
-        int maxVisible = 8;
+        // Table rows
+        int rowH = 28;
+        int tableTop = headerY + 22;
+        int maxVisible = (420 - tableTop) / rowH;
 
         for (size_t i = 0; i < games_.size(); ++i) {
             int row = static_cast<int>(i) - scrollOffset_;
             if (row < 0 || row >= maxVisible) continue;
 
-            int x = startX;
-            int y = startY + row * (cardH + padY);
-
+            int y = tableTop + row * rowH;
             bool selected = (static_cast<int>(i) == selectedIndex_);
             bool available = games_[i].available;
 
-            // Card background
-            Color bgColor, borderColor;
+            // Row background (alternating + selection highlight)
+            Color rowBg;
             if (selected && available) {
-                bgColor = Color(50, 60, 100);
-                borderColor = Color(100, 150, 255);
+                rowBg = Color(45, 55, 95);
             } else if (selected) {
-                bgColor = Color(45, 35, 50);
-                borderColor = Color(150, 100, 130);
-            } else if (available) {
-                bgColor = Color(25, 30, 50);
-                borderColor = Color(50, 60, 80);
+                rowBg = Color(55, 40, 55);
+            } else if (row % 2 == 0) {
+                rowBg = Color(24, 26, 34);
             } else {
-                bgColor = Color(20, 20, 28);
-                borderColor = Color(40, 35, 45);
+                rowBg = Color(28, 30, 40);
             }
+            renderer->fillRect(Rect(4, y, tableW, rowH), rowBg);
 
-            renderer->fillRect(Rect(x, y, cardW, cardH), bgColor);
-            renderer->drawRect(Rect(x, y, cardW, cardH), borderColor);
-
-            // Selection indicator
+            // Selection indicator bar
             if (selected) {
-                Color indicatorColor = available ? Color(100, 200, 255) : Color(150, 100, 130);
-                renderer->fillRect(Rect(x + 2, y + 2, 4, cardH - 4), indicatorColor);
+                Color barColor = available ? Color(80, 160, 255) : Color(160, 100, 130);
+                renderer->fillRect(Rect(4, y, 3, rowH), barColor);
             }
 
+            // Name column
+            TextColor nameColor;
             if (available) {
-                // Game name
-                TextColor nameColor = selected ? TextColor(255, 255, 255) : TextColor(180, 180, 200);
-                text->drawText(renderer, games_[i].name.c_str(), x + 12, y + 5, nameColor);
-
-                // Asset summary on the right
-                char assetLine[128];
-                snprintf(assetLine, sizeof(assetLine), "%d sprites  %d wav  %d midi",
-                         games_[i].spriteCount, games_[i].wavCount, games_[i].midiCount);
-                text->drawText(renderer, assetLine, x + 12, y + 24,
-                              TextColor(80, 100, 130));
-
-                // Status badge on the right side
-                text->drawText(renderer, "[Installed]", x + cardW - 100, y + 5,
-                              TextColor(80, 180, 80));
+                nameColor = selected ? TextColor(255, 255, 255) : TextColor(200, 205, 220);
             } else {
-                // Game name (dimmed)
-                TextColor nameColor = selected ? TextColor(180, 150, 170) : TextColor(100, 90, 110);
-                text->drawText(renderer, games_[i].name.c_str(), x + 12, y + 5, nameColor);
+                nameColor = selected ? TextColor(170, 140, 160) : TextColor(100, 90, 105);
+            }
 
-                // "Add game data..." prompt
-                TextColor addColor = selected ? TextColor(200, 150, 100) : TextColor(120, 100, 80);
-                text->drawText(renderer, "Add game data...", x + 12, y + 24, addColor);
+            // Truncate long names
+            std::string displayName = games_[i].name;
+            if (displayName.length() > 34) {
+                displayName = displayName.substr(0, 31) + "...";
+            }
+            text->drawText(renderer, displayName.c_str(), colName, y + 7, nameColor);
 
-                // Status badge
-                text->drawText(renderer, "[Not installed]", x + cardW - 130, y + 5,
-                              TextColor(120, 80, 80));
+            // ID column
+            TextColor idColor = available ? TextColor(120, 140, 170) : TextColor(70, 65, 80);
+            text->drawText(renderer, games_[i].id.c_str(), colId, y + 7, idColor);
+
+            // Status column
+            if (available) {
+                text->drawText(renderer, "Installed", colStatus, y + 7, TextColor(80, 190, 80));
+            } else {
+                TextColor addColor = selected ? TextColor(220, 160, 80) : TextColor(130, 100, 70);
+                text->drawText(renderer, "Add data...", colStatus, y + 7, addColor);
+            }
+
+            // Sprites column
+            if (available && games_[i].spriteCount > 0) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", games_[i].spriteCount);
+                text->drawText(renderer, buf, colSprite, y + 7, TextColor(100, 120, 150));
+            } else {
+                text->drawText(renderer, "--", colSprite, y + 7, TextColor(50, 50, 60));
+            }
+
+            // WAV column
+            if (available && games_[i].wavCount > 0) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", games_[i].wavCount);
+                text->drawText(renderer, buf, colWav, y + 7, TextColor(100, 120, 150));
+            } else {
+                text->drawText(renderer, "--", colWav, y + 7, TextColor(50, 50, 60));
+            }
+
+            // MIDI column
+            if (available && games_[i].midiCount > 0) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", games_[i].midiCount);
+                text->drawText(renderer, buf, colMidi, y + 7, TextColor(100, 120, 150));
+            } else {
+                text->drawText(renderer, "--", colMidi, y + 7, TextColor(50, 50, 60));
             }
         }
 
-        // Bottom info bar
-        renderer->fillRect(Rect(0, 440, 640, 40), Color(25, 30, 50));
+        // Bottom separator
+        int bottomY = tableTop + maxVisible * rowH;
+        renderer->fillRect(Rect(4, bottomY, tableW, 1), Color(50, 55, 70));
+
+        // Status bar at bottom
+        renderer->fillRect(Rect(0, 450, 640, 30), Color(30, 33, 45));
 
         if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(games_.size())) {
             bool available = games_[selectedIndex_].available;
             if (available) {
-                text->drawTextAligned(renderer, "ENTER: Open game   ESC: Quit",
-                                     0, 448, 640, TextAlign::Center,
-                                     TextColor(200, 200, 255));
+                char info[128];
+                snprintf(info, sizeof(info), "%s  |  %d sprites, %d wav, %d midi",
+                         games_[selectedIndex_].name.c_str(),
+                         games_[selectedIndex_].spriteCount,
+                         games_[selectedIndex_].wavCount,
+                         games_[selectedIndex_].midiCount);
+                text->drawText(renderer, info, 10, 457, TextColor(180, 185, 210));
             } else {
-                text->drawTextAligned(renderer, "ENTER or Right-Click: Import game data   ESC: Quit",
-                                     0, 448, 640, TextAlign::Center,
-                                     TextColor(200, 180, 150));
+                char info[128];
+                snprintf(info, sizeof(info), "%s  |  Right-click or ENTER to import",
+                         games_[selectedIndex_].name.c_str());
+                text->drawText(renderer, info, 10, 457, TextColor(180, 150, 130));
             }
         }
 
-        char countInfo[64];
+        // Game count on the right side of status bar
         int avail = 0;
         for (const auto& g : games_) { if (g.available) avail++; }
-        snprintf(countInfo, sizeof(countInfo), "%d of %zu games installed",
-                 avail, games_.size());
-        text->drawTextAligned(renderer, countInfo, 0, 464, 640, TextAlign::Center,
-                             TextColor(100, 110, 140));
+        char countBuf[32];
+        snprintf(countBuf, sizeof(countBuf), "%d / %zu", avail, games_.size());
+        text->drawText(renderer, countBuf, 580, 457, TextColor(100, 110, 130));
     }
 
     void handleInput() override {
@@ -298,13 +343,11 @@ public:
         int mouseX, mouseY;
         renderer->screenToGame(screenX, screenY, mouseX, mouseY);
 
-        // Find which card the mouse is over
-        int hoveredIndex = hitTestCard(mouseX, mouseY);
+        int hoveredIndex = hitTestRow(mouseY);
 
         if (input->isMouseButtonPressed(MouseButton::Left)) {
             if (hoveredIndex >= 0) {
                 if (hoveredIndex == selectedIndex_) {
-                    // Click on already selected = activate
                     activateGame(selectedIndex_);
                 } else {
                     selectedIndex_ = hoveredIndex;
@@ -322,7 +365,7 @@ public:
 
         // Mouse wheel scrolling
         int wheel = input->getMouseWheelDelta();
-        int maxScroll = std::max(0, static_cast<int>(games_.size()) - 8);
+        int maxScroll = std::max(0, static_cast<int>(games_.size()) - maxVisibleRows());
         if (wheel > 0 && scrollOffset_ > 0) {
             scrollOffset_--;
         } else if (wheel < 0 && scrollOffset_ < maxScroll) {
@@ -331,29 +374,27 @@ public:
     }
 
 private:
-    int hitTestCard(int mouseX, int mouseY) {
-        int cardW = 590, cardH = 44, padY = 4;
-        int startX = (640 - cardW) / 2;
-        int startY = 50;
+    int maxVisibleRows() const {
+        return (420 - 26) / 28;  // (tableArea - headerHeight) / rowHeight
+    }
 
-        for (size_t i = 0; i < games_.size(); ++i) {
-            int row = static_cast<int>(i) - scrollOffset_;
-            if (row < 0 || row >= 8) continue;
+    int hitTestRow(int mouseY) {
+        int tableTop = 26;
+        int rowH = 28;
+        if (mouseY < tableTop) return -1;
 
-            int x = startX;
-            int y = startY + row * (cardH + padY);
-
-            if (mouseX >= x && mouseX < x + cardW &&
-                mouseY >= y && mouseY < y + cardH) {
-                return static_cast<int>(i);
-            }
+        int row = (mouseY - tableTop) / rowH;
+        int index = row + scrollOffset_;
+        if (index >= 0 && index < static_cast<int>(games_.size())) {
+            return index;
         }
         return -1;
     }
 
     void ensureVisible() {
+        int maxVis = maxVisibleRows();
         if (selectedIndex_ < scrollOffset_) scrollOffset_ = selectedIndex_;
-        if (selectedIndex_ >= scrollOffset_ + 8) scrollOffset_ = selectedIndex_ - 7;
+        if (selectedIndex_ >= scrollOffset_ + maxVis) scrollOffset_ = selectedIndex_ - maxVis + 1;
     }
 
     void activateGame(int index);
@@ -1212,8 +1253,8 @@ int main(int argc, char* argv[]) {
         game.pushState(std::make_unique<AssetViewerState>(&game));
     });
 
-    // Start with title screen
-    game.pushState(std::make_unique<TitleState>(&game));
+    // Start directly with game selection (like RPCS3)
+    game.pushState(std::make_unique<GameSelectionState>(&game));
 
     // Run main loop
     game.run();
