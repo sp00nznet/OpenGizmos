@@ -15,15 +15,51 @@ namespace fs = std::filesystem;
 
 namespace opengg {
 
-GameRegistry::GameRegistry() = default;
+GameRegistry::GameRegistry() {
+    // Always populate with all known TLC games so the UI always shows the full list
+    populateKnownGames();
+}
+
 GameRegistry::~GameRegistry() = default;
+
+void GameRegistry::populateKnownGames() {
+    struct KnownGame {
+        const char* id;
+        const char* name;
+    };
+    static const KnownGame knownGames[] = {
+        {"ssg", "Super Solvers: Gizmos & Gadgets"},
+        {"on",  "Operation Neptune"},
+        {"tms", "Treasure MathStorm!"},
+        {"tcv", "Treasure Cove!"},
+        {"ssr", "Super Solvers: Spellbound!"},
+        {"sso", "Super Solvers: OutNumbered!"},
+        {"tmt", "Treasure Mountain!"},
+        {"ssb", "Super Solvers: Spellbound Wizards"},
+    };
+
+    for (const auto& kg : knownGames) {
+        if (games_.find(kg.id) == games_.end()) {
+            GameInfo info;
+            info.id = kg.id;
+            info.name = kg.name;
+            info.company = "TLC";
+            info.available = false;
+            games_[info.id] = info;
+            gameOrder_.push_back(info.id);
+        }
+    }
+}
 
 bool GameRegistry::discoverGames(const std::string& extractedBasePath) {
     extractedBasePath_ = extractedBasePath;
-    games_.clear();
-    gameOrder_.clear();
 
-    // Try to parse the manifest file
+    // Reset availability and counts (keep the known games list)
+    for (auto& pair : games_) {
+        pair.second.available = false;
+    }
+
+    // Try to parse the manifest file to get real asset counts
     std::string manifestPath = extractedBasePath + "/all_games_manifest.json";
     if (fs::exists(manifestPath)) {
         if (!parseManifest(manifestPath)) {
@@ -130,8 +166,23 @@ bool GameRegistry::parseManifest(const std::string& manifestPath) {
 
         if (!info.id.empty()) {
             info.extractedPath = extractedBasePath_ + "/" + info.id;
-            games_[info.id] = info;
-            gameOrder_.push_back(info.id);
+            // Merge into existing entry (preserves known game list order)
+            auto it = games_.find(info.id);
+            if (it != games_.end()) {
+                // Update existing entry with manifest data
+                it->second.name = info.name;
+                it->second.company = info.company;
+                it->second.sourcePath = info.sourcePath;
+                it->second.spriteCount = info.spriteCount;
+                it->second.wavCount = info.wavCount;
+                it->second.midiCount = info.midiCount;
+                it->second.puzzleCount = info.puzzleCount;
+                it->second.videoCount = info.videoCount;
+                it->second.extractedPath = info.extractedPath;
+            } else {
+                games_[info.id] = info;
+                gameOrder_.push_back(info.id);
+            }
         }
 
         pos = keyStart + 1;

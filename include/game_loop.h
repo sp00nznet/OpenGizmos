@@ -95,6 +95,13 @@ public:
     void setNewGameCallback(std::function<void()> callback) { onNewGame_ = callback; }
     void setAssetViewerCallback(std::function<void()> callback) { onAssetViewer_ = callback; }
 
+    // Import game data (opens native folder picker)
+#ifdef _WIN32
+    bool browseForGameFolder();
+#else
+    bool browseForGameFolder() { return false; }
+#endif
+
 private:
     void processFrame();
     void updateTiming();
@@ -103,7 +110,6 @@ private:
     bool saveConfig();
 #ifdef _WIN32
     void handleMenuCommand(int menuId);
-    bool browseForGameFolder();
 #endif
 
     GameConfig config_;

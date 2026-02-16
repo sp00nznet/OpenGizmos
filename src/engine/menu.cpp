@@ -81,7 +81,7 @@ void MenuBar::createMenus() {
 
     // === Config Menu ===
     configMenu_ = CreatePopupMenu();
-    AppendMenuW(configMenu_, MF_STRING, ID_CONFIG_LOAD_GG_FILES, L"&Load GG Files...");
+    AppendMenuW(configMenu_, MF_STRING, ID_CONFIG_LOAD_GG_FILES, L"&Import Game Data...");
     AppendMenuW(configMenu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(configMenu_, MF_STRING, ID_CONFIG_CONTROLS, L"&Controls...");
     AppendMenuW(configMenu_, MF_STRING, ID_CONFIG_SCALING, L"&Scaling...");

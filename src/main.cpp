@@ -116,7 +116,7 @@ private:
     float fadeProgress_ = 0.0f;
 };
 
-// Game Selection state - shows grid of available games
+// Game Selection state - shows list of all known games
 class GameSelectionState : public GameState {
 public:
     explicit GameSelectionState(Game* game) : game_(game) {}
@@ -126,17 +126,14 @@ public:
         selectedIndex_ = 0;
         scrollOffset_ = 0;
 
-        // Get available games from registry
+        // Get ALL known games (available + unavailable)
         GameRegistry* registry = game_->getGameRegistry();
         if (registry) {
-            games_ = registry->getAvailableGames();
+            games_ = registry->getAllGames();
         }
 
-        if (games_.empty()) {
-            SDL_Log("No games found in registry!");
-        } else {
-            SDL_Log("Found %zu games", games_.size());
-        }
+        SDL_Log("Showing %zu games (%d available)",
+                games_.size(), game_->getGameRegistry() ? game_->getGameRegistry()->getAvailableCount() : 0);
     }
 
     void exit() override {}
@@ -159,87 +156,107 @@ public:
                             TextColor(255, 255, 100));
 
         if (games_.empty()) {
-            text->drawTextAligned(renderer, "No extracted games found.", 0, 200, 640, TextAlign::Center,
+            text->drawTextAligned(renderer, "No games configured.", 0, 200, 640, TextAlign::Center,
                                 TextColor(200, 100, 100));
-            text->drawTextAligned(renderer, "Place extracted game directories in 'extracted/'", 0, 230, 640, TextAlign::Center,
-                                TextColor(150, 150, 180));
             return;
         }
 
-        // Game grid: 2 columns, 4 rows visible
-        int cols = 2;
-        int cardW = 290;
-        int cardH = 90;
-        int padX = 15;
-        int padY = 10;
-        int startX = (640 - (cols * cardW + (cols - 1) * padX)) / 2;
+        // Game list: single column, full width
+        int cardW = 590;
+        int cardH = 44;
+        int padY = 4;
+        int startX = (640 - cardW) / 2;
         int startY = 50;
-        int maxVisibleRows = 4;
+        int maxVisible = 8;
 
         for (size_t i = 0; i < games_.size(); ++i) {
-            int row = static_cast<int>(i) / cols - scrollOffset_;
-            int col = static_cast<int>(i) % cols;
+            int row = static_cast<int>(i) - scrollOffset_;
+            if (row < 0 || row >= maxVisible) continue;
 
-            if (row < 0 || row >= maxVisibleRows) continue;
-
-            int x = startX + col * (cardW + padX);
+            int x = startX;
             int y = startY + row * (cardH + padY);
 
             bool selected = (static_cast<int>(i) == selectedIndex_);
+            bool available = games_[i].available;
 
             // Card background
-            Color bgColor = selected ? Color(50, 60, 100) : Color(25, 30, 50);
-            Color borderColor = selected ? Color(100, 150, 255) : Color(50, 60, 80);
+            Color bgColor, borderColor;
+            if (selected && available) {
+                bgColor = Color(50, 60, 100);
+                borderColor = Color(100, 150, 255);
+            } else if (selected) {
+                bgColor = Color(45, 35, 50);
+                borderColor = Color(150, 100, 130);
+            } else if (available) {
+                bgColor = Color(25, 30, 50);
+                borderColor = Color(50, 60, 80);
+            } else {
+                bgColor = Color(20, 20, 28);
+                borderColor = Color(40, 35, 45);
+            }
 
             renderer->fillRect(Rect(x, y, cardW, cardH), bgColor);
             renderer->drawRect(Rect(x, y, cardW, cardH), borderColor);
 
             // Selection indicator
             if (selected) {
-                renderer->fillRect(Rect(x + 2, y + 2, 4, cardH - 4), Color(100, 200, 255));
+                Color indicatorColor = available ? Color(100, 200, 255) : Color(150, 100, 130);
+                renderer->fillRect(Rect(x + 2, y + 2, 4, cardH - 4), indicatorColor);
             }
 
-            // Game name
-            TextColor nameColor = selected ? TextColor(255, 255, 255) : TextColor(180, 180, 200);
-            text->drawText(renderer, games_[i].name.c_str(), x + 12, y + 8, nameColor);
+            if (available) {
+                // Game name
+                TextColor nameColor = selected ? TextColor(255, 255, 255) : TextColor(180, 180, 200);
+                text->drawText(renderer, games_[i].name.c_str(), x + 12, y + 5, nameColor);
 
-            // Game ID and company
-            char infoLine[128];
-            snprintf(infoLine, sizeof(infoLine), "[%s] %s",
-                     games_[i].id.c_str(), games_[i].company.c_str());
-            text->drawText(renderer, infoLine, x + 12, y + 28,
-                          TextColor(100, 120, 160));
+                // Asset summary on the right
+                char assetLine[128];
+                snprintf(assetLine, sizeof(assetLine), "%d sprites  %d wav  %d midi",
+                         games_[i].spriteCount, games_[i].wavCount, games_[i].midiCount);
+                text->drawText(renderer, assetLine, x + 12, y + 24,
+                              TextColor(80, 100, 130));
 
-            // Asset counts
-            char assetLine[128];
-            snprintf(assetLine, sizeof(assetLine), "Sprites: %d  WAV: %d  MIDI: %d",
-                     games_[i].spriteCount, games_[i].wavCount, games_[i].midiCount);
-            text->drawText(renderer, assetLine, x + 12, y + 48,
-                          TextColor(80, 100, 130));
+                // Status badge on the right side
+                text->drawText(renderer, "[Installed]", x + cardW - 100, y + 5,
+                              TextColor(80, 180, 80));
+            } else {
+                // Game name (dimmed)
+                TextColor nameColor = selected ? TextColor(180, 150, 170) : TextColor(100, 90, 110);
+                text->drawText(renderer, games_[i].name.c_str(), x + 12, y + 5, nameColor);
 
-            // Puzzle/video counts
-            char extraLine[128];
-            snprintf(extraLine, sizeof(extraLine), "Puzzles: %d  Videos: %d",
-                     games_[i].puzzleCount, games_[i].videoCount);
-            text->drawText(renderer, extraLine, x + 12, y + 64,
-                          TextColor(70, 90, 120));
+                // "Add game data..." prompt
+                TextColor addColor = selected ? TextColor(200, 150, 100) : TextColor(120, 100, 80);
+                text->drawText(renderer, "Add game data...", x + 12, y + 24, addColor);
+
+                // Status badge
+                text->drawText(renderer, "[Not installed]", x + cardW - 130, y + 5,
+                              TextColor(120, 80, 80));
+            }
         }
 
         // Bottom info bar
         renderer->fillRect(Rect(0, 440, 640, 40), Color(25, 30, 50));
 
-        // Selected game info
         if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(games_.size())) {
-            char selInfo[128];
-            snprintf(selInfo, sizeof(selInfo), "%s  (%d/%zu)",
-                     games_[selectedIndex_].name.c_str(),
-                     selectedIndex_ + 1, games_.size());
-            text->drawTextAligned(renderer, selInfo, 0, 448, 640, TextAlign::Center,
-                                 TextColor(200, 200, 255));
+            bool available = games_[selectedIndex_].available;
+            if (available) {
+                text->drawTextAligned(renderer, "ENTER: Open game   ESC: Quit",
+                                     0, 448, 640, TextAlign::Center,
+                                     TextColor(200, 200, 255));
+            } else {
+                text->drawTextAligned(renderer, "ENTER or Right-Click: Import game data   ESC: Quit",
+                                     0, 448, 640, TextAlign::Center,
+                                     TextColor(200, 180, 150));
+            }
         }
 
-        text->drawTextAligned(renderer, "Arrow Keys: Navigate   ENTER: Select   ESC: Quit",
-                             0, 464, 640, TextAlign::Center, TextColor(100, 110, 140));
+        char countInfo[64];
+        int avail = 0;
+        for (const auto& g : games_) { if (g.available) avail++; }
+        snprintf(countInfo, sizeof(countInfo), "%d of %zu games installed",
+                 avail, games_.size());
+        text->drawTextAligned(renderer, countInfo, 0, 464, 640, TextAlign::Center,
+                             TextColor(100, 110, 140));
     }
 
     void handleInput() override {
@@ -253,43 +270,26 @@ public:
 
         if (games_.empty()) return;
 
-        int cols = 2;
-        int totalRows = (static_cast<int>(games_.size()) + cols - 1) / cols;
-
         // Keyboard navigation
         if (input->isActionPressed(GameAction::MenuUp) ||
             input->isActionPressed(GameAction::MoveUp)) {
-            if (selectedIndex_ >= cols) {
-                selectedIndex_ -= cols;
-                ensureVisible();
-            }
-        }
-        if (input->isActionPressed(GameAction::MenuDown) ||
-            input->isActionPressed(GameAction::MoveDown)) {
-            if (selectedIndex_ + cols < static_cast<int>(games_.size())) {
-                selectedIndex_ += cols;
-                ensureVisible();
-            }
-        }
-        if (input->isActionPressed(GameAction::MoveLeft) ||
-            input->isActionPressed(GameAction::MenuLeft)) {
             if (selectedIndex_ > 0) {
                 selectedIndex_--;
                 ensureVisible();
             }
         }
-        if (input->isActionPressed(GameAction::MoveRight) ||
-            input->isActionPressed(GameAction::MenuRight)) {
+        if (input->isActionPressed(GameAction::MenuDown) ||
+            input->isActionPressed(GameAction::MoveDown)) {
             if (selectedIndex_ < static_cast<int>(games_.size()) - 1) {
                 selectedIndex_++;
                 ensureVisible();
             }
         }
 
-        // Enter to launch
+        // Enter to launch (available) or import (unavailable)
         if (input->isActionPressed(GameAction::Action) ||
             input->isActionPressed(GameAction::MenuSelect)) {
-            launchGame(selectedIndex_);
+            activateGame(selectedIndex_);
         }
 
         // Mouse support
@@ -298,52 +298,66 @@ public:
         int mouseX, mouseY;
         renderer->screenToGame(screenX, screenY, mouseX, mouseY);
 
+        // Find which card the mouse is over
+        int hoveredIndex = hitTestCard(mouseX, mouseY);
+
         if (input->isMouseButtonPressed(MouseButton::Left)) {
-            // Check which card was clicked
-            int cardW = 290, cardH = 90, padX = 15, padY = 10;
-            int startX = (640 - (cols * cardW + (cols - 1) * padX)) / 2;
-            int startY = 50;
-
-            for (size_t i = 0; i < games_.size(); ++i) {
-                int row = static_cast<int>(i) / cols - scrollOffset_;
-                int col = static_cast<int>(i) % cols;
-
-                if (row < 0 || row >= 4) continue;
-
-                int x = startX + col * (cardW + padX);
-                int y = startY + row * (cardH + padY);
-
-                if (mouseX >= x && mouseX < x + cardW &&
-                    mouseY >= y && mouseY < y + cardH) {
-                    if (static_cast<int>(i) == selectedIndex_) {
-                        // Double-click launches
-                        launchGame(selectedIndex_);
-                    } else {
-                        selectedIndex_ = static_cast<int>(i);
-                    }
-                    break;
+            if (hoveredIndex >= 0) {
+                if (hoveredIndex == selectedIndex_) {
+                    // Click on already selected = activate
+                    activateGame(selectedIndex_);
+                } else {
+                    selectedIndex_ = hoveredIndex;
                 }
+            }
+        }
+
+        // Right-click to import game data
+        if (input->isMouseButtonPressed(MouseButton::Right)) {
+            if (hoveredIndex >= 0) {
+                selectedIndex_ = hoveredIndex;
+                importGameData(selectedIndex_);
             }
         }
 
         // Mouse wheel scrolling
         int wheel = input->getMouseWheelDelta();
+        int maxScroll = std::max(0, static_cast<int>(games_.size()) - 8);
         if (wheel > 0 && scrollOffset_ > 0) {
             scrollOffset_--;
-        } else if (wheel < 0 && scrollOffset_ < totalRows - 4) {
+        } else if (wheel < 0 && scrollOffset_ < maxScroll) {
             scrollOffset_++;
         }
     }
 
 private:
-    void ensureVisible() {
-        int cols = 2;
-        int row = selectedIndex_ / cols;
-        if (row < scrollOffset_) scrollOffset_ = row;
-        if (row >= scrollOffset_ + 4) scrollOffset_ = row - 3;
+    int hitTestCard(int mouseX, int mouseY) {
+        int cardW = 590, cardH = 44, padY = 4;
+        int startX = (640 - cardW) / 2;
+        int startY = 50;
+
+        for (size_t i = 0; i < games_.size(); ++i) {
+            int row = static_cast<int>(i) - scrollOffset_;
+            if (row < 0 || row >= 8) continue;
+
+            int x = startX;
+            int y = startY + row * (cardH + padY);
+
+            if (mouseX >= x && mouseX < x + cardW &&
+                mouseY >= y && mouseY < y + cardH) {
+                return static_cast<int>(i);
+            }
+        }
+        return -1;
     }
 
-    void launchGame(int index);
+    void ensureVisible() {
+        if (selectedIndex_ < scrollOffset_) scrollOffset_ = selectedIndex_;
+        if (selectedIndex_ >= scrollOffset_ + 8) scrollOffset_ = selectedIndex_ - 7;
+    }
+
+    void activateGame(int index);
+    void importGameData(int index);
 
     Game* game_;
     std::vector<GameInfo> games_;
@@ -1092,13 +1106,36 @@ void TitleState::advanceToGameSelect() {
     game_->changeState(std::make_unique<GameSelectionState>(game_));
 }
 
-void GameSelectionState::launchGame(int index) {
+void GameSelectionState::activateGame(int index) {
+    if (index < 0 || index >= static_cast<int>(games_.size())) return;
+
+    if (games_[index].available) {
+        // Game is installed -- open the launch screen
+        const std::string& gameId = games_[index].id;
+        SDL_Log("GameSelection: Launching game '%s'", gameId.c_str());
+        game_->pushState(std::make_unique<GameLaunchState>(game_, gameId));
+    } else {
+        // Game not installed -- trigger import
+        importGameData(index);
+    }
+}
+
+void GameSelectionState::importGameData(int index) {
     if (index < 0 || index >= static_cast<int>(games_.size())) return;
 
     const std::string& gameId = games_[index].id;
-    SDL_Log("GameSelection: Launching game '%s'", gameId.c_str());
+    const std::string& gameName = games_[index].name;
+    SDL_Log("GameSelection: Import data for '%s' (%s)", gameName.c_str(), gameId.c_str());
 
-    game_->pushState(std::make_unique<GameLaunchState>(game_, gameId));
+    // Use the game's folder browser (which opens a native dialog)
+    bool imported = game_->browseForGameFolder();
+    if (imported) {
+        // Refresh the game list
+        GameRegistry* registry = game_->getGameRegistry();
+        if (registry) {
+            games_ = registry->getAllGames();
+        }
+    }
 }
 
 void GameLaunchState::executeOption(int option) {

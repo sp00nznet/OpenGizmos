@@ -59,6 +59,7 @@ public:
     int getAvailableCount() const;
 
 private:
+    void populateKnownGames();
     bool parseManifest(const std::string& manifestPath);
     bool validateGameDirectory(const std::string& gameId);
 

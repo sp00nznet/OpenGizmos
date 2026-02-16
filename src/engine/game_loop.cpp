@@ -498,7 +498,7 @@ bool Game::browseForGameFolder() {
     pFileDialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
 
     // Set title
-    pFileDialog->SetTitle(L"Select Game Installation Folder");
+    pFileDialog->SetTitle(L"Select Extracted Game Data Folder");
 
     // Show the dialog
     hr = pFileDialog->Show(hwnd);
@@ -521,46 +521,94 @@ bool Game::browseForGameFolder() {
 
                 SDL_Log("Selected folder: %s", selectedPath.c_str());
 
-                // Validate the folder contains game files
-                std::vector<std::string> possiblePaths = {
-                    selectedPath + "/SSGWINCD/GIZMO.DAT",
-                    selectedPath + "/GIZMO.DAT",
-                    selectedPath + "/SSGWINCD/GIZMO256.DAT",
-                    selectedPath + "/GIZMO256.DAT",
-                };
-
+                // Check if this is an extracted games root (has all_games_manifest.json)
                 bool found = false;
-                for (const auto& testPath : possiblePaths) {
-                    if (fs::exists(testPath)) {
+                std::string extractedPath;
+
+                if (fs::exists(selectedPath + "/all_games_manifest.json")) {
+                    // User selected the extracted/ directory itself
+                    extractedPath = selectedPath;
+                    found = true;
+                } else if (fs::exists(selectedPath + "/extracted/all_games_manifest.json")) {
+                    // User selected the parent of extracted/
+                    extractedPath = selectedPath + "/extracted";
+                    found = true;
+                } else {
+                    // Check if any game subdirectory has a sprites/ folder
+                    // (user might have selected a single game's directory)
+                    for (const auto& entry : fs::directory_iterator(selectedPath)) {
+                        if (entry.is_directory()) {
+                            std::string sub = entry.path().string();
+                            if (fs::exists(sub + "/sprites") || fs::exists(sub + "/audio")) {
+                                // Looks like an extracted game root
+                                extractedPath = selectedPath;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    // Also check if this folder itself has sprites/ (single game dir)
+                    if (!found && (fs::exists(selectedPath + "/sprites") ||
+                                   fs::exists(selectedPath + "/audio"))) {
+                        // User selected a single game directory -- use its parent
+                        extractedPath = fs::path(selectedPath).parent_path().string();
                         found = true;
-                        break;
                     }
                 }
 
-                if (found) {
-                    // Valid game folder - update config
-                    config_.gamePath = selectedPath;
+                // Also check for legacy Gizmos .DAT files
+                if (!found) {
+                    std::vector<std::string> legacyPaths = {
+                        selectedPath + "/SSGWINCD/GIZMO.DAT",
+                        selectedPath + "/GIZMO.DAT",
+                        selectedPath + "/ONWINCD/NEP256.DLL",
+                    };
+                    for (const auto& testPath : legacyPaths) {
+                        if (fs::exists(testPath)) {
+                            config_.gamePath = selectedPath;
+                            saveConfig();
+                            if (assetCache_) {
+                                assetCache_->initialize(config_.gamePath, config_.cachePath);
+                                assetCache_->setRenderer(renderer_->getSDLRenderer());
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (found && !extractedPath.empty()) {
+                    // Re-discover games with the new path
+                    if (gameRegistry_) {
+                        gameRegistry_->discoverGames(extractedPath);
+                    }
+                    if (assetCache_) {
+                        assetCache_->setExtractedBasePath(extractedPath);
+                    }
                     saveConfig();
 
-                    // Reinitialize asset cache with new path
-                    if (assetCache_) {
-                        assetCache_->initialize(config_.gamePath, config_.cachePath);
-                        assetCache_->setRenderer(renderer_->getSDLRenderer());
-                    }
+                    int avail = gameRegistry_ ? gameRegistry_->getAvailableCount() : 0;
+                    char msg[512];
+                    snprintf(msg, sizeof(msg),
+                             "Game data loaded!\n\n"
+                             "Path: %s\n"
+                             "Games found: %d",
+                             extractedPath.c_str(), avail);
 
                     SDL_Window* sdlWindow = renderer_ ? renderer_->getSDLWindow() : nullptr;
                     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Success",
-                        ("Game files found!\n\nPath: " + selectedPath +
-                         "\n\nThe game will now use these files.").c_str(), sdlWindow);
+                        msg, sdlWindow);
 
                     pItem->Release();
                     pFileDialog->Release();
                     return true;
-                } else {
+                } else if (!found) {
                     SDL_Window* sdlWindow = renderer_ ? renderer_->getSDLWindow() : nullptr;
-                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Invalid Folder",
-                        "Could not find Gizmos & Gadgets files in the selected folder.\n\n"
-                        "Please select a folder containing GIZMO.DAT or the SSGWINCD subfolder.",
+                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "No Game Data Found",
+                        "Could not find game data in the selected folder.\n\n"
+                        "Select a folder containing extracted game directories\n"
+                        "(with sprites/ and audio/ subfolders), or select\n"
+                        "the 'extracted' folder with all_games_manifest.json.",
                         sdlWindow);
                 }
             }
